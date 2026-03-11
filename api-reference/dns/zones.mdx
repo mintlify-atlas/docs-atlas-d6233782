@@ -1,0 +1,555 @@
+---
+title: 'DNS Zones'
+description: 'Manage DNS zones with DNSSEC and SOA configuration'
+---
+
+DNS zones are authoritative containers for domain name records, with support for DNSSEC and SOA configuration.
+
+## Create Zone
+
+Create a new DNS zone.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+zone, err := client.DNS.Zones.New(ctx, dns.ZoneNewParams{
+    Name: gcore.F("example.com"),
+    Contact: gcore.F("admin@example.com"),
+    Enabled: gcore.F(true),
+    Ttl: gcore.F(int64(3600)),
+    Refresh: gcore.F(int64(10800)),
+    Retry: gcore.F(int64(3600)),
+    Expiry: gcore.F(int64(604800)),
+    NxTtl: gcore.F(int64(300)),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Zone ID: %d\n", zone.ID)
+```
+
+```json Response
+{
+  "id": 12345,
+  "warnings": []
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="name" type="string" required>
+  Name of the DNS zone (e.g., "example.com")
+</ParamField>
+
+<ParamField path="contact" type="string">
+  Email address of the administrator responsible for this zone
+</ParamField>
+
+<ParamField path="enabled" type="boolean" default={true}>
+  If disabled, zone records will not be resolved on DNS servers
+</ParamField>
+
+<ParamField path="primary_server" type="string">
+  Primary master name server for the zone
+</ParamField>
+
+<ParamField path="refresh" type="integer" default={10800}>
+  Seconds after which secondary name servers should query the master for SOA record to detect zone changes
+</ParamField>
+
+<ParamField path="retry" type="integer" default={3600}>
+  Seconds after which secondary name servers should retry to request the serial number
+</ParamField>
+
+<ParamField path="expiry" type="integer" default={604800}>
+  Seconds after which secondary name servers should stop answering requests for this zone
+</ParamField>
+
+<ParamField path="nx_ttl" type="integer" default={300}>
+  Time To Live for negative caching (NXDOMAIN responses)
+</ParamField>
+
+<ParamField path="serial" type="integer">
+  Serial number for zone version tracking. If not specified, timestamp will be used
+</ParamField>
+
+<ParamField path="meta" type="object">
+  Arbitrary metadata in JSON format. Can include:
+  - `webhook` - URL to receive notifications about zone changes
+  - `webhook_method` - HTTP method for webhook (default: POST)
+</ParamField>
+
+### Response Fields
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the created zone
+</ResponseField>
+
+<ResponseField name="warnings" type="array">
+  Array of warning messages, if any
+</ResponseField>
+
+## List Zones
+
+Retrieve a list of DNS zones with filtering and pagination.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+response, err := client.DNS.Zones.List(ctx, dns.ZoneListParams{
+    Enabled: gcore.F(true),
+    Limit: gcore.F(int64(50)),
+    Offset: gcore.F(int64(0)),
+    OrderBy: gcore.F("name"),
+    OrderDirection: gcore.F(dns.ZoneListParamsOrderDirectionAsc),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Total zones: %d\n", response.TotalAmount)
+for _, zone := range response.Zones {
+    fmt.Printf("Zone: %s (ID: %d, Enabled: %v)\n", zone.Name, zone.ID, zone.Enabled)
+}
+```
+
+```json Response
+{
+  "total_amount": 2,
+  "zones": [
+    {
+      "id": 12345,
+      "name": "example.com",
+      "enabled": true,
+      "dnssec_enabled": false,
+      "contact": "admin@example.com",
+      "primary_server": "ns1.gcorelabs.net",
+      "refresh": 10800,
+      "retry": 3600,
+      "expiry": 604800,
+      "nx_ttl": 300,
+      "serial": 1709068637,
+      "status": "active",
+      "rrsets_amount": {
+        "total": 5,
+        "static": 4,
+        "dynamic": {
+          "total": 1,
+          "healthcheck": 0
+        }
+      }
+    }
+  ]
+}
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField path="limit" type="integer" default={100}>
+  Maximum number of records to return
+</ParamField>
+
+<ParamField path="offset" type="integer" default={0}>
+  Number of records to skip before beginning to return results
+</ParamField>
+
+<ParamField path="enabled" type="boolean">
+  Filter by enabled/disabled status
+</ParamField>
+
+<ParamField path="dynamic" type="boolean">
+  Filter zones with dynamic RRsets
+</ParamField>
+
+<ParamField path="healthcheck" type="boolean">
+  Filter zones with RRsets that have healthchecks enabled
+</ParamField>
+
+<ParamField path="name" type="array">
+  Filter by zone names (can pass multiple values)
+</ParamField>
+
+<ParamField path="order_by" type="string">
+  Field name to sort by
+</ParamField>
+
+<ParamField path="order_direction" type="string">
+  Sort order: `asc` or `desc`
+</ParamField>
+
+## Get Zone
+
+Retrieve detailed information about a specific zone.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+zone, err := client.DNS.Zones.Get(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Zone: %s\n", zone.Name)
+fmt.Printf("Enabled: %v\n", zone.Enabled)
+fmt.Printf("DNSSEC: %v\n", zone.DnssecEnabled)
+fmt.Printf("Total records: %d\n", zone.RrsetsAmount.Total)
+```
+
+```json Response
+{
+  "id": 12345,
+  "name": "example.com",
+  "enabled": true,
+  "dnssec_enabled": false,
+  "contact": "admin@example.com",
+  "primary_server": "ns1.gcorelabs.net",
+  "refresh": 10800,
+  "retry": 3600,
+  "expiry": 604800,
+  "nx_ttl": 300,
+  "serial": 1709068637,
+  "status": "active",
+  "records": [
+    {
+      "name": "example.com",
+      "type": "A",
+      "ttl": 3600,
+      "short_answers": ["192.0.2.1"]
+    }
+  ],
+  "rrsets_amount": {
+    "total": 5,
+    "static": 4,
+    "dynamic": {
+      "total": 1,
+      "healthcheck": 0
+    }
+  }
+}
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Zone name (e.g., "example.com")
+</ParamField>
+
+## Update Zone
+
+Update zone configuration and SOA record.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+zone, err := client.DNS.Zones.Replace(ctx, "example.com", dns.ZoneReplaceParams{
+    Name: gcore.F("example.com"),
+    Contact: gcore.F("newadmin@example.com"),
+    Enabled: gcore.F(true),
+    Refresh: gcore.F(int64(7200)),
+    Retry: gcore.F(int64(1800)),
+    Expiry: gcore.F(int64(1209600)),
+    NxTtl: gcore.F(int64(600)),
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Zone name to update
+</ParamField>
+
+## Delete Zone
+
+Delete a DNS zone and all its records.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+err := client.DNS.Zones.Delete(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Zone deleted successfully")
+```
+</CodeGroup>
+
+### Path Parameters
+
+<ParamField path="name" type="string" required>
+  Zone name to delete
+</ParamField>
+
+## Enable/Disable Zone
+
+Enable or disable DNS resolution for a zone.
+
+<CodeGroup>
+```go Enable
+ctx := context.Background()
+
+err := client.DNS.Zones.Enable(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+```go Disable
+ctx := context.Background()
+
+err := client.DNS.Zones.Disable(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+## Check Delegation Status
+
+Verify if a domain is properly delegated to Gcore name servers. This endpoint is rate-limited.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+status, err := client.DNS.Zones.CheckDelegationStatus(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Zone exists: %v\n", status.ZoneExists)
+fmt.Printf("Gcore authorized: %d\n", status.GcoreAuthorizedCount)
+fmt.Printf("Non-Gcore authorized: %d\n", status.NonGcoreAuthorizedCount)
+fmt.Printf("Whitelabel delegation: %v\n", status.IsWhitelabelDelegation)
+```
+
+```json Response
+{
+  "zone_exists": true,
+  "gcore_authorized_count": 2,
+  "non_gcore_authorized_count": 0,
+  "is_whitelabel_delegation": false,
+  "authoritative_name_servers": [
+    {
+      "name": "ns1.gcorelabs.net",
+      "ipv4Addresses": ["1.2.3.4"],
+      "ipv6Addresses": ["2001:db8::1"]
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Get Zone Statistics
+
+Retrieve DNS query statistics for a zone. Use `all` as the zone name to get statistics for all zones.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+stats, err := client.DNS.Zones.GetStatistics(ctx, "example.com", dns.ZoneGetStatisticsParams{
+    From: gcore.F(int64(1709068637)),
+    To: gcore.F(int64(1709673437)),
+    Granularity: gcore.F("1h"),
+    RecordType: gcore.F("A"),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Total requests: %d\n", stats.Total)
+```
+
+```json Response
+{
+  "total": 152460,
+  "requests": {
+    "1598608080000": 14716,
+    "1598608140000": 51167,
+    "1598608200000": 53432,
+    "1598611020000": 51050,
+    "1598611080000": 52611,
+    "1598611140000": 46884
+  }
+}
+```
+</CodeGroup>
+
+### Query Parameters
+
+<ParamField path="from" type="integer">
+  Beginning of time period (Unix timestamp, UTC)
+</ParamField>
+
+<ParamField path="to" type="integer">
+  End of time period (Unix timestamp, UTC)
+</ParamField>
+
+<ParamField path="granularity" type="string">
+  Time interval granularity (e.g., "5m", "1h", "1d"). Valid units: s, m, h
+</ParamField>
+
+<ParamField path="record_type" type="string">
+  Filter by DNS record type: A, AAAA, NS, CNAME, MX, TXT, SVCB, HTTPS
+</ParamField>
+
+<Note>
+  Statistics are updated in near real-time, typically within 30 minutes.
+</Note>
+
+## Import Zone
+
+Import DNS records in BIND9 format.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+bindZoneFile := `
+$TTL 3600
+@   IN  SOA ns1.example.com. admin.example.com. (
+        2024010101 ; serial
+        10800      ; refresh
+        3600       ; retry
+        604800     ; expire
+        300 )      ; minimum
+
+    IN  NS  ns1.example.com.
+    IN  NS  ns2.example.com.
+    IN  A   192.0.2.1
+www IN  A   192.0.2.2
+`
+
+result, err := client.DNS.Zones.Import(ctx, "example.com", dns.ZoneImportParams{
+    Body: bindZoneFile,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Success: %v\n", result.Success)
+fmt.Printf("Imported RRsets: %d\n", result.Imported.Rrsets)
+fmt.Printf("Resource records: %d\n", result.Imported.ResourceRecords)
+```
+
+```json Response
+{
+  "success": true,
+  "imported": {
+    "rrsets": 4,
+    "resource_records": 5,
+    "skipped_resource_records": 0,
+    "qtype": 0
+  },
+  "warnings": {}
+}
+```
+</CodeGroup>
+
+## Export Zone
+
+Export zone records in BIND9 format.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+export, err := client.DNS.Zones.Export(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println(export.RawZone)
+```
+
+```json Response
+{
+  "raw_zone": "$TTL 3600\n@ IN SOA ns1.gcorelabs.net. admin.example.com. 2024010101 10800 3600 604800 300\n@ IN NS ns1.gcorelabs.net.\n@ IN NS ns2.gcdn.services.\n@ IN A 192.0.2.1\nwww IN A 192.0.2.2\n"
+}
+```
+</CodeGroup>
+
+## DNSSEC Management
+
+### Enable DNSSEC
+
+Enable DNSSEC for a DNS zone and retrieve DS records.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+response, err := client.DNS.Zones.Dnssec.Update(ctx, "example.com", dns.ZoneDnssecUpdateParams{
+    Enabled: gcore.F(true),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("DS Record: %s\n", response.Ds)
+fmt.Printf("Algorithm: %s\n", response.Algorithm)
+fmt.Printf("Key Tag: %d\n", response.KeyTag)
+```
+
+```json Response
+{
+  "uuid": "550e8400-e29b-41d4-a716-446655440000",
+  "algorithm": "ECDSAP256SHA256",
+  "key_type": "ZSK",
+  "flags": 256,
+  "key_tag": 12345,
+  "public_key": "mdsswUyr3DPW132mOi8V9xESWE8jTo0dxCjjnopKl+GqJxpVXckHAeF+KkxLbxILfDLUT0rAK9iUzy1L53eKGQ==",
+  "digest_type": "SHA-256",
+  "digest_algorithm": "2",
+  "digest": "E2D3C916F6DEEAC73294E8268FB5885044A833FC5459588F4A9184CFC41A5766",
+  "ds": "12345 13 2 E2D3C916F6DEEAC73294E8268FB5885044A833FC5459588F4A9184CFC41A5766",
+  "message": "DNSSEC enabled successfully"
+}
+```
+</CodeGroup>
+
+### Get DNSSEC Information
+
+Retrieve DNSSEC DS records for a zone.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+dnssec, err := client.DNS.Zones.Dnssec.Get(ctx, "example.com")
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("DS Record: %s\n", dnssec.Ds)
+```
+</CodeGroup>
+
+### Disable DNSSEC
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+err := client.DNS.Zones.Dnssec.Update(ctx, "example.com", dns.ZoneDnssecUpdateParams{
+    Enabled: gcore.F(false),
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>

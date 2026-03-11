@@ -1,80 +1,238 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quickstart
+description: Get started with the Gcore Go SDK in minutes
 ---
 
-## Get started in three steps
+This guide will help you make your first API call using the Gcore Go SDK. We'll create a simple application that creates a new Cloud project.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Before you begin, make sure you have:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+- Go 1.22 or higher installed
+- A Gcore account with an API key
+- The Gcore Go SDK installed (see [Installation](/installation))
 
-### Step 2: Deploy your changes
+## Complete Example
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+Here's a complete working example that creates a new Cloud project:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```go main.go
+package main
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+import (
+    "context"
+    "fmt"
 
-### Step 3: Go live
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("My API Key"), // defaults to os.LookupEnv("GCORE_API_KEY")
+    )
+    project, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    if err != nil {
+        panic(err.Error())
+    }
+    fmt.Printf("%+v\n", project.ID)
+}
+```
 
-## Next steps
+## Step-by-Step Walkthrough
 
-Now that you have your docs running, explore these key features:
+Let's break down the example above into steps:
+
+<Steps>
+  <Step title="Import required packages">
+    Import the Gcore SDK and related packages you'll need:
+
+    ```go
+    import (
+        "context"
+        "fmt"
+
+        "github.com/G-Core/gcore-go"
+        "github.com/G-Core/gcore-go/cloud"
+        "github.com/G-Core/gcore-go/option"
+    )
+    ```
+
+    - `gcore` - Main SDK package
+    - `cloud` - Cloud services (projects, instances, volumes, etc.)
+    - `option` - Request options for configuring the client and requests
+  </Step>
+
+  <Step title="Create a client instance">
+    Initialize the Gcore client with your API key:
+
+    ```go
+    client := gcore.NewClient(
+        option.WithAPIKey("My API Key"),
+    )
+    ```
+
+    <Note>
+    If you don't provide an API key, the client will automatically look for the `GCORE_API_KEY` environment variable. This is the recommended approach for production applications.
+    </Note>
+
+    **Using environment variables (recommended):**
+
+    ```go
+    // Reads GCORE_API_KEY from environment
+    client := gcore.NewClient()
+    ```
+  </Step>
+
+  <Step title="Make your first API call">
+    Use the client to create a new Cloud project:
+
+    ```go
+    project, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    if err != nil {
+        panic(err.Error())
+    }
+    ```
+
+    The SDK uses the standard Go `context` package for request lifecycle management. Use `context.TODO()` for simple examples, or pass a more specific context for production code.
+  </Step>
+
+  <Step title="Handle the response">
+    Process the API response:
+
+    ```go
+    fmt.Printf("%+v\n", project.ID)
+    ```
+
+    All response objects in the SDK are strongly typed structs with fields matching the API response. You can access any field directly:
+
+    ```go
+    fmt.Printf("Project ID: %d\n", project.ID)
+    fmt.Printf("Project Name: %s\n", project.Name)
+    ```
+  </Step>
+</Steps>
+
+## Running Your Code
+
+Save the code to a file (e.g., `main.go`) and run it:
+
+<CodeGroup>
+
+```bash Direct execution
+go run main.go
+```
+
+```bash Build and run
+go build -o myapp
+./myapp
+```
+
+</CodeGroup>
+
+You should see output similar to:
+
+```
+123456
+```
+
+## Error Handling
+
+The SDK returns detailed error information when requests fail. Here's how to handle errors properly:
+
+```go
+import (
+    "errors"
+    "fmt"
+    "github.com/G-Core/gcore-go"
+)
+
+project, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+    Name: "my-project",
+})
+if err != nil {
+    // Check if it's an API error
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) {
+        fmt.Printf("API Error: %d - %s\n", apierr.StatusCode, apierr.Message)
+        // Debug: print full request/response
+        fmt.Println(string(apierr.DumpRequest(true)))
+        fmt.Println(string(apierr.DumpResponse(true)))
+        return
+    }
+    // Handle other errors (network, etc.)
+    panic(err.Error())
+}
+```
+
+## Common Operations
+
+Here are a few more examples of common operations:
+
+### List Resources
+
+```go
+// List all projects
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(10),
+})
+for iter.Next() {
+    project := iter.Current()
+    fmt.Printf("Project: %s (ID: %d)\n", project.Name, project.ID)
+}
+if err := iter.Err(); err != nil {
+    panic(err.Error())
+}
+```
+
+### Using Context for Timeouts
+
+```go
+import "time"
+
+ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+defer cancel()
+
+project, err := client.Cloud.Projects.New(ctx, cloud.ProjectNewParams{
+    Name: "my-project",
+})
+```
+
+### Configuring Request Options
+
+```go
+// Add custom headers or override defaults per-request
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    cloud.ProjectNewParams{
+        Name: "my-project",
+    },
+    option.WithHeader("X-Custom-Header", "value"),
+    option.WithMaxRetries(5),
+)
+```
+
+## Next Steps
+
+Now that you've made your first API call, explore more features:
 
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Authentication" icon="key" href="/authentication">
+    Learn about different authentication methods
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/core-concepts">
+    Understand pagination, error handling, and more
+  </Card>
+  <Card title="Cloud Services" icon="cloud" href="/cloud/overview">
+    Explore Cloud resources like instances and volumes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Browse the complete API documentation
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>

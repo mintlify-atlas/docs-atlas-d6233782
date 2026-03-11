@@ -1,0 +1,449 @@
+---
+title: 'Kubernetes Clusters'
+description: 'Create and manage managed Kubernetes clusters with worker node pools'
+---
+
+Managed Kubernetes clusters with configurable worker node pools, networking, and cluster add-ons.
+
+## Methods
+
+### New
+
+Create a new Kubernetes cluster.
+
+```go
+func (r *K8SClusterService) New(ctx context.Context, params K8SClusterNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *K8SClusterService) NewAndPoll(ctx context.Context, params K8SClusterNewParams, opts ...option.RequestOption) (*K8SCluster, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Cluster name
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  Kubernetes version (e.g., "1.28")
+</ParamField>
+
+<ParamField path="keypair" type="string" required>
+  SSH keypair name for node access
+</ParamField>
+
+<ParamField path="pools" type="[]Pool" required>
+  Worker node pool configurations
+</ParamField>
+
+<ParamField path="fixed_network" type="string">
+  Network ID for the cluster
+</ParamField>
+
+<ParamField path="fixed_subnet" type="string">
+  Subnet ID for the cluster
+</ParamField>
+
+<ParamField path="pods_ip_pool" type="string">
+  IP pool for pods (CIDR)
+</ParamField>
+
+<ParamField path="services_ip_pool" type="string">
+  IP pool for services (CIDR)
+</ParamField>
+
+<ParamField path="is_ipv6" type="bool">
+  Enable IPv6 support
+</ParamField>
+
+<ParamField path="cni" type="CNI">
+  Container Network Interface configuration (Calico or Cilium)
+</ParamField>
+
+<ParamField path="csi" type="CSI">
+  Container Storage Interface settings
+</ParamField>
+
+<ParamField path="authentication" type="Authentication">
+  OIDC authentication settings
+</ParamField>
+
+<ParamField path="autoscaler_config" type="map[string]string">
+  Cluster autoscaler configuration overrides
+</ParamField>
+
+<ParamField path="logging" type="Logging">
+  Logging configuration (LaaS integration)
+</ParamField>
+
+<ParamField path="add_ons" type="AddOns">
+  Cluster add-ons configuration (e.g., Slurm)
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Cluster UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Cluster name
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Cluster status: Provisioning, Provisioned, Deleting
+</ResponseField>
+
+<ResponseField name="version" type="string">
+  Kubernetes version
+</ResponseField>
+
+<ResponseField name="pools" type="[]Pool">
+  Worker node pools
+</ResponseField>
+
+### Update
+
+Update cluster configuration.
+
+```go
+func (r *K8SClusterService) Update(ctx context.Context, clusterName string, params K8SClusterUpdateParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *K8SClusterService) UpdateAndPoll(ctx context.Context, clusterName string, params K8SClusterUpdateParams, opts ...option.RequestOption) (*K8SCluster, error)
+```
+
+### List
+
+List all Kubernetes clusters.
+
+```go
+func (r *K8SClusterService) List(ctx context.Context, query K8SClusterListParams, opts ...option.RequestOption) (*K8SClusterList, error)
+```
+
+### Get
+
+Get cluster details.
+
+```go
+func (r *K8SClusterService) Get(ctx context.Context, clusterName string, query K8SClusterGetParams, opts ...option.RequestOption) (*K8SCluster, error)
+```
+
+### Delete
+
+Delete a cluster.
+
+```go
+func (r *K8SClusterService) Delete(ctx context.Context, clusterName string, params K8SClusterDeleteParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *K8SClusterService) DeleteAndPoll(ctx context.Context, clusterName string, params K8SClusterDeleteParams, opts ...option.RequestOption) error
+```
+
+### GetKubeconfig
+
+Retrieve the kubeconfig file for cluster access.
+
+```go
+func (r *K8SClusterService) GetKubeconfig(ctx context.Context, clusterName string, query K8SClusterGetKubeconfigParams, opts ...option.RequestOption) (*K8SClusterKubeconfig, error)
+```
+
+<ResponseField name="config" type="string">
+  Complete kubeconfig YAML content
+</ResponseField>
+
+<ResponseField name="host" type="string">
+  Kubernetes API server URL
+</ResponseField>
+
+<ResponseField name="client_certificate" type="string">
+  Base64-encoded client certificate
+</ResponseField>
+
+<ResponseField name="client_key" type="string">
+  Base64-encoded client key
+</ResponseField>
+
+<ResponseField name="cluster_ca_certificate" type="string">
+  Base64-encoded CA certificate
+</ResponseField>
+
+### GetCertificate
+
+Get cluster CA certificate.
+
+```go
+func (r *K8SClusterService) GetCertificate(ctx context.Context, clusterName string, query K8SClusterGetCertificateParams, opts ...option.RequestOption) (*K8SClusterCertificate, error)
+```
+
+### Upgrade
+
+Upgrade cluster to a new Kubernetes version.
+
+```go
+func (r *K8SClusterService) Upgrade(ctx context.Context, clusterName string, params K8SClusterUpgradeParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *K8SClusterService) UpgradeAndPoll(ctx context.Context, clusterName string, params K8SClusterUpgradeParams, opts ...option.RequestOption) (*K8SCluster, error)
+```
+
+<ParamField path="version" type="string" required>
+  Target Kubernetes version
+</ParamField>
+
+### ListVersionsForUpgrade
+
+Get available upgrade versions.
+
+```go
+func (r *K8SClusterService) ListVersionsForUpgrade(ctx context.Context, clusterName string, query K8SClusterListVersionsForUpgradeParams, opts ...option.RequestOption) (*K8SClusterVersionList, error)
+```
+
+## Sub-Services
+
+### Pools
+
+Manage worker node pools.
+
+```go
+client.Cloud.K8S.Clusters.Pools.New(ctx, clusterName, params)
+client.Cloud.K8S.Clusters.Pools.List(ctx, clusterName, params)
+client.Cloud.K8S.Clusters.Pools.Get(ctx, clusterName, poolID, params)
+client.Cloud.K8S.Clusters.Pools.Update(ctx, clusterName, poolID, params)
+client.Cloud.K8S.Clusters.Pools.Delete(ctx, clusterName, poolID, params)
+```
+
+**Pool Properties:**
+- `flavor_id`: Instance flavor for nodes
+- `min_node_count`: Minimum number of nodes (autoscaling)
+- `max_node_count`: Maximum number of nodes (autoscaling)
+- `boot_volume_size`: Boot volume size in GB
+- `boot_volume_type`: Volume type (standard, ssd_hiiops, etc.)
+- `auto_healing_enabled`: Enable automatic node replacement
+- `servergroup_policy`: affinity, anti-affinity, soft-anti-affinity
+
+### Nodes
+
+Manage individual nodes within pools.
+
+```go
+client.Cloud.K8S.Clusters.Nodes.List(ctx, clusterName, params)
+client.Cloud.K8S.Clusters.Nodes.Get(ctx, clusterName, nodeID, params)
+```
+
+## Examples
+
+### Create a Basic Kubernetes Cluster
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+pools := []cloud.K8SClusterNewParamsPool{
+    {
+        Name:            "default-pool",
+        FlavorID:        "g1-standard-2-4",
+        MinNodeCount:    1,
+        MaxNodeCount:    param.NewOpt[int64](3),
+        BootVolumeSize:  param.NewOpt[int64](50),
+        BootVolumeType:  "standard",
+        IsPublicIpv4:    param.NewOpt(true),
+        AutoHealingEnabled: param.NewOpt(true),
+    },
+}
+
+cluster, err := client.Cloud.K8S.Clusters.NewAndPoll(context.Background(), 
+    cloud.K8SClusterNewParams{
+        Name:     "my-k8s-cluster",
+        Version:  "1.28",
+        Keypair:  "my-ssh-key",
+        Pools:    pools,
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created cluster: %s\n", cluster.Name)
+```
+
+### Create Cluster with Custom Networking
+
+```go
+cluster, err := client.Cloud.K8S.Clusters.NewAndPoll(context.Background(), 
+    cloud.K8SClusterNewParams{
+        Name:            "custom-network-cluster",
+        Version:         "1.28",
+        Keypair:         "my-ssh-key",
+        Pools:           pools,
+        FixedNetwork:    param.NewOpt(networkID),
+        FixedSubnet:     param.NewOpt(subnetID),
+        PodsIPPool:      param.NewOpt("10.100.0.0/16"),
+        ServicesIPPool:  param.NewOpt("10.200.0.0/16"),
+    },
+)
+```
+
+### Get Kubeconfig
+
+```go
+kubeconfig, err := client.Cloud.K8S.Clusters.GetKubeconfig(context.Background(), 
+    clusterName,
+    cloud.K8SClusterGetKubeconfigParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Save to file
+err = os.WriteFile("kubeconfig.yaml", []byte(kubeconfig.Config), 0600)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Kubeconfig saved to kubeconfig.yaml")
+```
+
+### Add a Node Pool
+
+```go
+pool, err := client.Cloud.K8S.Clusters.Pools.NewAndPoll(context.Background(), 
+    clusterName,
+    cloud.K8SClusterPoolNewParams{
+        Name:            "gpu-pool",
+        FlavorID:        "g1-gpu-1-4-1xV100",
+        MinNodeCount:    0,
+        MaxNodeCount:    param.NewOpt[int64](5),
+        BootVolumeSize:  param.NewOpt[int64](100),
+        BootVolumeType:  "ssd_hiiops",
+        Labels:          map[string]string{"workload": "gpu"},
+        Taints:          map[string]string{"gpu": "true:NoSchedule"},
+    },
+)
+```
+
+### List Clusters
+
+```go
+clusters, err := client.Cloud.K8S.Clusters.List(context.Background(), 
+    cloud.K8SClusterListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, cluster := range clusters.Results {
+    fmt.Printf("Cluster: %s, Version: %s, Status: %s\n", 
+        cluster.Name, cluster.Version, cluster.Status)
+}
+```
+
+### Upgrade Cluster
+
+```go
+// List available versions
+versions, err := client.Cloud.K8S.Clusters.ListVersionsForUpgrade(
+    context.Background(),
+    clusterName,
+    cloud.K8SClusterListVersionsForUpgradeParams{},
+)
+
+if len(versions.Results) > 0 {
+    // Upgrade to latest version
+    cluster, err := client.Cloud.K8S.Clusters.UpgradeAndPoll(
+        context.Background(),
+        clusterName,
+        cloud.K8SClusterUpgradeParams{
+            Version: versions.Results[0],
+        },
+    )
+    fmt.Printf("Upgraded to version: %s\n", cluster.Version)
+}
+```
+
+### Update Pool Size
+
+```go
+pool, err := client.Cloud.K8S.Clusters.Pools.UpdateAndPoll(context.Background(), 
+    clusterName,
+    poolID,
+    cloud.K8SClusterPoolUpdateParams{
+        MinNodeCount: param.NewOpt[int64](2),
+        MaxNodeCount: param.NewOpt[int64](10),
+    },
+)
+```
+
+### Delete Cluster
+
+```go
+err := client.Cloud.K8S.Clusters.DeleteAndPoll(context.Background(), 
+    clusterName,
+    cloud.K8SClusterDeleteParams{},
+)
+```
+
+## Common Use Cases
+
+### Production Cluster with HA
+
+```go
+pools := []cloud.K8SClusterNewParamsPool{
+    {
+        Name:               "control-plane-pool",
+        FlavorID:           "g1-standard-4-8",
+        MinNodeCount:       3, // HA control plane
+        MaxNodeCount:       param.NewOpt[int64](3),
+        BootVolumeSize:     param.NewOpt[int64](100),
+        BootVolumeType:     "ssd_hiiops",
+        ServergroupPolicy:  "anti-affinity",
+        AutoHealingEnabled: param.NewOpt(true),
+    },
+    {
+        Name:               "worker-pool",
+        FlavorID:           "g1-standard-8-16",
+        MinNodeCount:       3,
+        MaxNodeCount:       param.NewOpt[int64](10),
+        BootVolumeSize:     param.NewOpt[int64](200),
+        BootVolumeType:     "ssd_hiiops",
+        ServergroupPolicy:  "soft-anti-affinity",
+        AutoHealingEnabled: param.NewOpt(true),
+    },
+}
+
+cluster, _ := client.Cloud.K8S.Clusters.NewAndPoll(context.Background(), 
+    cloud.K8SClusterNewParams{
+        Name:    "production-cluster",
+        Version: "1.28",
+        Keypair: "prod-ssh-key",
+        Pools:   pools,
+    },
+)
+```
+
+### Cluster with Cilium CNI
+
+```go
+cluster, err := client.Cloud.K8S.Clusters.NewAndPoll(context.Background(), 
+    cloud.K8SClusterNewParams{
+        Name:    "cilium-cluster",
+        Version: "1.28",
+        Keypair: "my-ssh-key",
+        Pools:   pools,
+        Cni: cloud.K8SClusterNewParamsCni{
+            Provider: "cilium",
+            Cilium: cloud.K8SClusterNewParamsCniCilium{
+                Encryption:     param.NewOpt(true),
+                HubbleRelay:    param.NewOpt(true),
+                HubbleUi:       param.NewOpt(true),
+                LbAcceleration: param.NewOpt(true),
+            },
+        },
+    },
+)
+```

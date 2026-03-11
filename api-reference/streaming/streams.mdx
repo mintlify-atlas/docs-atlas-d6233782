@@ -1,0 +1,383 @@
+---
+title: "Video Streams"
+description: "Create and manage live video streams with low-latency delivery, DVR, and recording capabilities"
+---
+
+## Overview
+
+The Streams service enables you to create and manage live video streams with professional features including low-latency delivery (±4 seconds), DVR functionality, automatic recording, and real-time HTML overlays.
+
+## Stream Object
+
+The Stream object contains all configuration and status information for a live stream.
+
+<ResponseField name="id" type="int64">
+  Stream ID
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Stream name. Often used as a human-readable identifier.
+  
+  Examples: "Conference in July", "Stream #10003", "Open-Air Camera #31 Backstage"
+</ResponseField>
+
+<ResponseField name="active" type="bool">
+  Stream on/off switch. When false, PULL is deactivated and PUSH returns an error.
+</ResponseField>
+
+<ResponseField name="live" type="bool">
+  Whether the main server is currently receiving and transcoding the stream
+</ResponseField>
+
+<ResponseField name="backup_live" type="bool">
+  Whether the backup server is currently receiving the stream (PUSH method only)
+</ResponseField>
+
+<ResponseField name="pull" type="bool">
+  - `true`: Stream is received by PULL method from external server
+  - `false`: Stream is received by PUSH method from encoder/OBS/mobile app
+</ResponseField>
+
+<ResponseField name="push_url" type="string">
+  URL to PUSH stream using RTMP/RTMPS protocols. Change "rtmp://" to "rtmps://" for encrypted connection.
+</ResponseField>
+
+<ResponseField name="push_url_srt" type="string">
+  URL to PUSH stream using SRT protocol for low-latency over unreliable networks
+</ResponseField>
+
+<ResponseField name="push_url_whip" type="string">
+  URL to PUSH WebRTC stream using WHIP protocol for browser-based streaming
+</ResponseField>
+
+<ResponseField name="backup_push_url" type="string">
+  Backup RTMP/RTMPS URL for geographic redundancy
+</ResponseField>
+
+<ResponseField name="backup_push_url_srt" type="string">
+  Backup SRT URL for geographic redundancy
+</ResponseField>
+
+<ResponseField name="uri" type="string">
+  URL to pull stream from (PULL method only). Can specify multiple addresses separated by space for round-robin backup.
+</ResponseField>
+
+<ResponseField name="hls_cmaf_url" type="string">
+  HLS output URL with CMAF chunks (.m3u8). Recommended for all HLS streams. Supports low-latency (±5 sec default, ±3 sec available).
+</ResponseField>
+
+<ResponseField name="hls_mpegts_url" type="string">
+  Legacy HLS output with MPEG-TS chunks (.ts). For compatibility with legacy devices. Does not support low-latency.
+</ResponseField>
+
+<ResponseField name="dash_url" type="string">
+  MPEG-DASH output URL (.mpd). Supports low-latency (±4 sec default, ±2 sec available).
+</ResponseField>
+
+<ResponseField name="iframe_url" type="string">
+  Built-in HTML web player URL. Can be embedded in iframe on your website.
+</ResponseField>
+
+<ResponseField name="dvr_enabled" type="bool">
+  Whether DVR (rewind) functionality is enabled
+</ResponseField>
+
+<ResponseField name="dvr_duration" type="int64">
+  DVR window duration in seconds. Range: [30...14400]. Maximum 4 hours.
+</ResponseField>
+
+<ResponseField name="auto_record" type="bool">
+  Enables automatic recording when stream starts. Recordings are saved to video hosting.
+</ResponseField>
+
+<ResponseField name="record_type" type="string">
+  Recording source:
+  - `origin`: Record original RTMP/SRT source
+  - `transcoded`: Record output with overlays and effects
+</ResponseField>
+
+<ResponseField name="recording_duration" type="float64">
+  Current recording duration in seconds (when recording is active)
+</ResponseField>
+
+<ResponseField name="projection" type="string">
+  360° visualization mode:
+  - `regular`: Normal flat stream
+  - `vr360`: 360° mode
+  - `vr180`: 180° mode
+  - `vr360tb`: 3D 360° Top-Bottom
+</ResponseField>
+
+<ResponseField name="html_overlay" type="bool">
+  Enable real-time HTML overlay widgets on stream
+</ResponseField>
+
+<ResponseField name="html_overlays" type="array">
+  Array of HTML overlay widgets configuration
+</ResponseField>
+
+<ResponseField name="transcoded_qualities" type="array">
+  List of qualities the stream is being transcoded to
+</ResponseField>
+
+<ResponseField name="transcoding_speed" type="float64">
+  Transcoding speed ratio. Should be 1.0 for real-time. Lower values indicate delivery issues.
+</ResponseField>
+
+<ResponseField name="screenshot" type="string">
+  URL to latest screenshot (updated every 10 seconds while live). JPEG format, 1080px wide.
+</ResponseField>
+
+## Create Stream
+
+Create a new live stream entity for broadcasting.
+
+```go stream.go
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:         "Conference 2024",
+    Active:       gcore.Bool(true),
+    Pull:         gcore.Bool(false), // PUSH mode
+    DvrEnabled:   gcore.Bool(true),
+    DvrDuration:  gcore.Int64(3600), // 1 hour
+    AutoRecord:   gcore.Bool(true),
+    RecordType:   gcore.String("transcoded"),
+})
+```
+
+<ParamField path="name" type="string" required>
+  Stream name for identification
+</ParamField>
+
+<ParamField path="active" type="bool">
+  Enable stream processing. Default: true
+</ParamField>
+
+<ParamField path="pull" type="bool">
+  - `true`: PULL stream from external server (requires `uri`)
+  - `false`: PUSH stream to our servers (default)
+</ParamField>
+
+<ParamField path="uri" type="string">
+  URL to pull stream from (required if `pull=true`). Can specify multiple URLs separated by space.
+</ParamField>
+
+<ParamField path="dvr_enabled" type="bool">
+  Enable DVR functionality. Default: false
+</ParamField>
+
+<ParamField path="dvr_duration" type="int64">
+  DVR window in seconds. Range: 30-14400 (4 hours). Default: 3600
+</ParamField>
+
+<ParamField path="auto_record" type="bool">
+  Automatically start recording when stream goes live. Default: false
+</ParamField>
+
+<ParamField path="record_type" type="string">
+  Recording source: `origin` or `transcoded`. Default: origin
+</ParamField>
+
+<ParamField path="projection" type="string">
+  360° mode: `regular`, `vr360`, `vr180`, `vr360tb`. Default: regular
+</ParamField>
+
+<ParamField path="html_overlay" type="bool">
+  Enable HTML overlay widgets. Default: false
+</ParamField>
+
+<ParamField path="quality_set_id" type="int64">
+  Custom quality set ID for transcoding
+</ParamField>
+
+<ParamField path="client_user_id" type="int64">
+  Custom user ID in your system
+</ParamField>
+
+<ParamField path="client_entity_data" type="string">
+  Custom metadata (JSON or any format)
+</ParamField>
+
+## Update Stream
+
+Update stream configuration. All parameters are optional.
+
+```go stream.go
+stream, err := client.Streaming.Streams.Update(
+    context.TODO(),
+    streamID,
+    streaming.StreamUpdateParams{
+        Stream: streaming.StreamUpdateParamsStream{
+            Name:       "Updated Conference Name",
+            Active:     gcore.Bool(true),
+            DvrEnabled: gcore.Bool(false),
+        },
+    },
+)
+```
+
+## Get Stream
+
+Retrieve stream details including current status and URLs.
+
+```go stream.go
+stream, err := client.Streaming.Streams.Get(context.TODO(), streamID)
+
+if stream.Live {
+    fmt.Printf("Stream is live! HLS URL: %s\n", stream.HlsCmafURL)
+    fmt.Printf("Player URL: %s\n", stream.IframeURL)
+}
+```
+
+## List Streams
+
+Retrieve a paginated list of all streams.
+
+```go stream.go
+page, err := client.Streaming.Streams.List(context.TODO(), streaming.StreamListParams{
+    Page: gcore.Int64(1),
+})
+
+for _, stream := range page.Items {
+    fmt.Printf("%d: %s (live: %v)\n", stream.ID, stream.Name, stream.Live)
+}
+```
+
+## Delete Stream
+
+Delete a live stream. Associated recordings remain as independent video entities.
+
+```go stream.go
+err := client.Streaming.Streams.Delete(context.TODO(), streamID)
+```
+
+<Note>
+  Consider using `active: false` instead of deleting if you want to temporarily disable the stream.
+</Note>
+
+## Start Recording
+
+Manually start recording a live stream. Stream must be live.
+
+```go stream.go
+response, err := client.Streaming.Streams.StartRecording(context.TODO(), streamID)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Recording started for stream %d\n", response.Data.Stream.ID)
+```
+
+<Note>
+  Recording takes ±3-7 seconds to initialize. Check the `recording` and `recording_duration` fields to confirm recording status.
+</Note>
+
+## Stop Recording
+
+Stop recording and save the video.
+
+```go stream.go
+video, err := client.Streaming.Streams.StopRecording(context.TODO(), streamID)
+
+if err != nil {
+    log.Fatal(err)
+}
+
+if video != nil {
+    fmt.Printf("Recording saved as video %d: %s\n", video.ID, video.Name)
+}
+```
+
+<ResponseField name="video" type="Video">
+  The created video entity from the recording. Returns empty if no recording was active.
+</ResponseField>
+
+## Clear DVR
+
+Clear the DVR buffer for a stream.
+
+```go stream.go
+err := client.Streaming.Streams.ClearDvr(context.TODO(), streamID)
+```
+
+## Protocol-Specific Examples
+
+### RTMP Push Example
+
+```go stream.go
+// Create PUSH stream
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:   "RTMP Live Stream",
+    Active: gcore.Bool(true),
+    Pull:   gcore.Bool(false),
+})
+
+// Use push_url in OBS or encoder
+fmt.Printf("RTMP URL: %s\n", stream.PushURL)
+fmt.Printf("RTMPS URL: %s\n", strings.Replace(stream.PushURL, "rtmp://", "rtmps://", 1))
+```
+
+### SRT Push Example
+
+```go stream.go
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:   "SRT Low-Latency Stream",
+    Active: gcore.Bool(true),
+})
+
+fmt.Printf("SRT URL: %s\n", stream.PushURLSrt)
+```
+
+<Warning>
+  Configure SRT latency to 400-2000ms based on your network conditions. Default values may not work well for all scenarios.
+</Warning>
+
+### HLS Pull Example
+
+```go stream.go
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:   "Pulled Stream",
+    Active: gcore.Bool(true),
+    Pull:   gcore.Bool(true),
+    Uri:    gcore.String("https://example.com/stream/playlist.m3u8"),
+})
+```
+
+### WebRTC WHIP Example
+
+```go stream.go
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:   "Browser Stream",
+    Active: gcore.Bool(true),
+})
+
+// Use push_url_whip with WHIP client in browser
+fmt.Printf("WHIP URL: %s\n", stream.PushURLWhip)
+```
+
+<Note>
+  WebRTC requires H.264 video and OPUS audio. Both tracks must be present.
+</Note>
+
+## Best Practices
+
+### Recording Management
+- Long broadcasts are automatically split into 4-hour videos
+- If stream drops, recording waits 10 seconds before finalizing
+- Use `auto_record` for unattended recording
+- Choose `record_type: transcoded` to include overlays
+
+### Backup Streams
+- Use backup URLs for geographic redundancy
+- System switches to backup after 3-10 seconds of main stream failure
+- Only one protocol can be active at a time (don't push RTMP and SRT simultaneously)
+
+### DVR Configuration
+- Set `dvr_duration` based on your use case (typical: 1-4 hours)
+- DVR consumes storage proportional to duration
+- Use `ClearDvr()` to free buffer space
+
+### Performance Monitoring
+- Check `transcoding_speed`: should be ~1.0 for real-time
+- Monitor `live` and `backup_live` status
+- Use `screenshot` URL for monitoring thumbnails

@@ -1,0 +1,316 @@
+---
+title: Authentication
+description: Learn how to authenticate with the Gcore API using the Go SDK
+---
+
+## API Key Authentication
+
+The Gcore Go SDK uses API key authentication. You can provide your API key in two ways:
+
+### Using the WithAPIKey Option
+
+```go
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("your-api-key"),
+    )
+}
+```
+
+### Using Environment Variables
+
+Set the `GCORE_API_KEY` environment variable:
+
+<CodeGroup>
+```bash Linux/macOS
+export GCORE_API_KEY="your-api-key"
+```
+
+```powershell Windows
+$env:GCORE_API_KEY="your-api-key"
+```
+
+```go Go Code
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+)
+
+func main() {
+    // Automatically reads from GCORE_API_KEY environment variable
+    client := gcore.NewClient()
+}
+```
+</CodeGroup>
+
+<Note>
+The SDK automatically looks up the `GCORE_API_KEY` environment variable when you call `NewClient()` without explicitly providing an API key.
+</Note>
+
+## How API Key Authentication Works
+
+When you provide an API key using `option.WithAPIKey()`, the SDK automatically adds an `Authorization` header to all requests:
+
+```
+Authorization: APIKey your-api-key
+```
+
+From the source code:
+
+```go
+// WithAPIKey returns a RequestOption that sets the client setting "api_key".
+func WithAPIKey(value string) RequestOption {
+    return requestconfig.RequestOptionFunc(func(r *requestconfig.RequestConfig) error {
+        r.APIKey = value
+        return r.Apply(WithHeader("authorization", fmt.Sprintf("APIKey %s", r.APIKey)))
+    })
+}
+```
+
+## Cloud-Specific Authentication
+
+For cloud operations, you may need to provide additional authentication parameters:
+
+### Project ID and Region ID
+
+Many cloud operations require a project ID and region ID:
+
+<CodeGroup>
+```go Using Options
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("your-api-key"),
+        option.WithCloudProjectID(12345),
+        option.WithCloudRegionID(67890),
+    )
+}
+```
+
+```bash Environment Variables
+export GCORE_API_KEY="your-api-key"
+export GCORE_CLOUD_PROJECT_ID="12345"
+export GCORE_CLOUD_REGION_ID="67890"
+```
+
+```go Reading from Environment
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+)
+
+func main() {
+    // Automatically reads GCORE_CLOUD_PROJECT_ID and GCORE_CLOUD_REGION_ID
+    client := gcore.NewClient()
+}
+```
+</CodeGroup>
+
+### Request-Level Override
+
+You can override the project ID and region ID for specific requests:
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("your-api-key"),
+        option.WithCloudProjectID(12345),
+    )
+    
+    // Use a different project ID for this specific request
+    project, err := client.Cloud.Projects.Get(
+        context.TODO(),
+        67890, // different project ID
+        option.WithCloudProjectID(67890),
+    )
+}
+```
+
+## Security Best Practices
+
+### 1. Never Hardcode API Keys
+
+<Warning>
+Do not hardcode API keys in your source code. Always use environment variables or secure configuration management.
+</Warning>
+
+```go
+// ❌ Bad - API key hardcoded
+client := gcore.NewClient(
+    option.WithAPIKey("ak_12345abcdef"),
+)
+
+// ✅ Good - API key from environment
+client := gcore.NewClient()
+```
+
+### 2. Use Environment Variables
+
+Store sensitive credentials in environment variables:
+
+```bash
+# .env file (add to .gitignore)
+GCORE_API_KEY=your-api-key
+GCORE_CLOUD_PROJECT_ID=12345
+GCORE_CLOUD_REGION_ID=67890
+```
+
+### 3. Secure API Key Storage
+
+For production environments, use secure secret management:
+
+- AWS Secrets Manager
+- HashiCorp Vault
+- Azure Key Vault
+- Google Secret Manager
+
+```go
+package main
+
+import (
+    "context"
+    "os"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    // Fetch from secure secret manager
+    apiKey := fetchFromSecretManager("gcore-api-key")
+    
+    client := gcore.NewClient(
+        option.WithAPIKey(apiKey),
+    )
+}
+
+func fetchFromSecretManager(secretName string) string {
+    // Implementation depends on your secret manager
+    // This is just an example
+    return os.Getenv("GCORE_API_KEY")
+}
+```
+
+### 4. Rotate API Keys Regularly
+
+<Tip>
+Regularly rotate your API keys and update them in your secret management system. This minimizes the impact of potential key exposure.
+</Tip>
+
+### 5. Use Minimal Permissions
+
+Generate API keys with only the permissions necessary for your application's operations.
+
+### 6. Monitor API Key Usage
+
+Regularly audit API key usage to detect unauthorized access:
+
+- Monitor for unusual request patterns
+- Set up alerts for failed authentication attempts
+- Review access logs periodically
+
+## Example: Complete Authentication Setup
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "os"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    // Verify API key is available
+    apiKey := os.Getenv("GCORE_API_KEY")
+    if apiKey == "" {
+        panic("GCORE_API_KEY environment variable is not set")
+    }
+    
+    // Initialize client with authentication
+    client := gcore.NewClient(
+        option.WithAPIKey(apiKey),
+        option.WithCloudProjectID(12345),
+        option.WithCloudRegionID(67890),
+    )
+    
+    // Make an authenticated request
+    project, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    if err != nil {
+        panic(err.Error())
+    }
+    
+    fmt.Printf("Created project: %d\n", project.ID)
+}
+```
+
+## Troubleshooting Authentication
+
+### Missing API Key
+
+If you get an authentication error, verify your API key is set:
+
+```go
+package main
+
+import (
+    "fmt"
+    "os"
+)
+
+func main() {
+    apiKey, exists := os.LookupEnv("GCORE_API_KEY")
+    if !exists {
+        fmt.Println("GCORE_API_KEY is not set")
+        return
+    }
+    fmt.Printf("API key is set (length: %d)\n", len(apiKey))
+}
+```
+
+### Invalid API Key
+
+If you receive a 401 Unauthorized error:
+
+1. Verify the API key is correct
+2. Check if the API key has been revoked
+3. Ensure the API key has appropriate permissions
+4. Verify you're using the correct environment (production/staging)
+
+### Project/Region Access Denied
+
+If you receive a 403 Forbidden error:
+
+1. Verify your API key has access to the specified project
+2. Confirm the project ID and region ID are correct
+3. Check if the project exists in the specified region

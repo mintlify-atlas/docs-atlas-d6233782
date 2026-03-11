@@ -1,0 +1,240 @@
+---
+title: "CDN Overview"
+description: "Manage CDN resources, origin groups, SSL certificates, and content delivery settings"
+---
+
+The CDN service provides comprehensive content delivery network functionality, including resource management, caching configuration, SSL/TLS certificates, origin shielding, and detailed analytics.
+
+## Service Structure
+
+The CDN service is organized into several key areas:
+
+- **CDN Resources** - Create and manage CDN resources with customizable caching and delivery options
+- **Origin Groups** - Configure origin servers with failover and load balancing
+- **SSL Certificates** - Manage HTTPS certificates with automated Let's Encrypt provisioning
+- **Rules** - Apply custom caching, security, and delivery rules to specific URL patterns
+- **Logs** - Access CDN operation logs for monitoring and troubleshooting
+- **Statistics** - View consumption metrics and performance data
+- **Shields** - Configure origin shielding to reduce origin server load
+
+## Initialize the Client
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+)
+
+// Create client - API key is read from GCORE_API_KEY environment variable
+client := gcore.NewClient()
+
+// Or specify API key explicitly
+client := gcore.NewClient(
+    option.WithAPIKey("your-api-key"),
+)
+```
+
+## Account Information
+
+### Get Account Overview
+
+Retrieve information about your CDN service account.
+
+```go
+account, err := client.CDN.GetAccountOverview(context.Background())
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Account ID: %d\n", account.ID)
+fmt.Printf("Service Status: %s\n", account.Service.Status)
+fmt.Printf("CNAME: %s\n", account.Cname)
+```
+
+<ResponseField name="id" type="int64">
+  Account ID
+</ResponseField>
+
+<ResponseField name="cname" type="string">
+  Domain zone to which CNAME records should be pointed
+</ResponseField>
+
+<ResponseField name="service" type="object">
+  CDN service status information
+  <Expandable title="properties">
+    <ResponseField name="enabled" type="boolean">
+      Whether the CDN service is activated
+    </ResponseField>
+    <ResponseField name="status" type="string">
+      Service status: `new`, `trial`, `trialend`, `activating`, `active`, `paused`, or `deleted`
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="auto_suspend_enabled" type="boolean">
+  Whether resources will be deactivated automatically by inactivity
+</ResponseField>
+
+<ResponseField name="utilization_level" type="int64">
+  CDN traffic usage limit in gigabytes. Email notification sent when limit is reached
+</ResponseField>
+
+### Get Account Limits
+
+Retrieve service limits for your account.
+
+```go
+limits, err := client.CDN.GetAccountLimits(context.Background())
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Resources Limit: %d\n", limits.ResourcesLimit)
+fmt.Printf("Rules Limit: %d\n", limits.RulesLimit)
+```
+
+<ResponseField name="resources_limit" type="int64">
+  Maximum number of CDN resources that can be created
+</ResponseField>
+
+<ResponseField name="rules_limit" type="int64">
+  Maximum number of rules per CDN resource
+</ResponseField>
+
+<ResponseField name="origins_in_group_limit" type="int64">
+  Maximum number of origins per origin group
+</ResponseField>
+
+<ResponseField name="secondary_hostnames_limit" type="int64">
+  Maximum number of secondary hostnames (additional CNAMEs) per resource
+</ResponseField>
+
+### Get Available Features
+
+Retrieve available CDN features for your account.
+
+```go
+features, err := client.CDN.GetAvailableFeatures(context.Background())
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, feature := range features.FreeFeatures {
+    fmt.Printf("Free Feature: %s (ID: %d)\n", feature.Name, feature.FeatureID)
+}
+
+for _, feature := range features.PaidFeatures {
+    fmt.Printf("Paid Feature: %s (ID: %d)\n", feature.Name, feature.FeatureID)
+}
+```
+
+## Purge Operations
+
+### List Purge Statuses
+
+Get the history of cache purge requests.
+
+```go
+params := cdn.CDNListPurgeStatusesParams{
+    Cname:       param.NewOpt("cdn.example.com"),
+    FromCreated: param.NewOpt("2024-01-01T00:00:00Z"),
+    ToCreated:   param.NewOpt("2024-01-31T23:59:59Z"),
+    Status:      param.NewOpt("Successful"),
+}
+
+statuses, err := client.CDN.ListPurgeStatuses(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, status := range *statuses {
+    fmt.Printf("Purge ID: %d, Type: %s, Status: %s\n", 
+        status.PurgeID, status.PurgeType, status.Status)
+}
+```
+
+<ParamField path="cname" type="string">
+  Filter by CDN resource CNAME
+</ParamField>
+
+<ParamField path="from_created" type="string">
+  Start date/time of the period (ISO 8601 format, UTC)
+</ParamField>
+
+<ParamField path="to_created" type="string">
+  End date/time of the period (ISO 8601 format, UTC)
+</ParamField>
+
+<ParamField path="purge_type" type="string">
+  Filter by purge type: `purge_by_pattern`, `purge_by_url`, or `purge_all`
+</ParamField>
+
+<ParamField path="status" type="string">
+  Filter by status: `In progress`, `Successful`, `Failed`, or `Status report disabled`
+</ParamField>
+
+## Regional Information
+
+### List AWS Regions
+
+```go
+regions, err := client.CDN.ListAwsRegions(context.Background())
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, region := range *regions {
+    fmt.Printf("%s: %s (%d)\n", region.Code, region.Name, region.ID)
+}
+```
+
+### List Alibaba Regions
+
+```go
+regions, err := client.CDN.ListAlibabaRegions(context.Background())
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, region := range *regions {
+    fmt.Printf("%s: %s (%d)\n", region.Code, region.Name, region.ID)
+}
+```
+
+## Update Account Settings
+
+Modify your CDN account configuration.
+
+```go
+params := cdn.CDNUpdateAccountParams{
+    UtilizationLevel: param.NewOpt[int64](10000), // 10TB limit
+}
+
+account, err := client.CDN.UpdateAccount(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Updated utilization level: %d GB\n", account.UtilizationLevel)
+```
+
+<ParamField path="utilization_level" type="int64">
+  CDN traffic usage limit in gigabytes. Email notification will be sent when the limit is reached
+</ParamField>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="CDN Resources" icon="server" href="/api-reference/cdn/resources">
+    Manage CDN resources and delivery configurations
+  </Card>
+  <Card title="Resource Rules" icon="list-check" href="/api-reference/cdn/rules">
+    Configure custom rules for URL patterns
+  </Card>
+  <Card title="SSL Certificates" icon="lock" href="/api-reference/cdn/certificates">
+    Manage SSL/TLS certificates for HTTPS delivery
+  </Card>
+  <Card title="CDN Logs" icon="file-lines" href="/api-reference/cdn/logs">
+    Access and download CDN operation logs
+  </Card>
+</CardGroup>

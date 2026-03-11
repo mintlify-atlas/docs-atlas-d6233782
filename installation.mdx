@@ -1,0 +1,183 @@
+---
+title: Installation
+description: Install and set up the Gcore Go SDK in your project
+---
+
+The Gcore Go SDK provides convenient access to the Gcore REST API from applications written in Go. This guide will walk you through installing and configuring the SDK.
+
+## Requirements
+
+The Gcore Go SDK requires **Go 1.22 or higher**. Make sure you have a compatible Go version installed:
+
+```bash
+go version
+```
+
+## Installation
+
+### Install via go get
+
+To install the latest version of the Gcore Go SDK, run:
+
+```bash
+go get github.com/G-Core/gcore-go
+```
+
+### Pin to a Specific Version
+
+For production applications, it's recommended to pin to a specific version:
+
+```bash
+go get -u 'github.com/G-Core/gcore-go@v0.37.0'
+```
+
+<Note>
+Replace `v0.37.0` with the specific version you want to use. Check the [releases page](https://github.com/G-Core/gcore-go/releases) for the latest version.
+</Note>
+
+## Import Paths
+
+Once installed, import the SDK in your Go code:
+
+```go
+import (
+    "github.com/G-Core/gcore-go"  // imported as gcore
+)
+```
+
+### Package Structure
+
+The SDK is organized into service-specific packages:
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"      // Cloud services
+    "github.com/G-Core/gcore-go/cdn"        // CDN services
+    "github.com/G-Core/gcore-go/dns"        // DNS services
+    "github.com/G-Core/gcore-go/storage"    // Storage services
+    "github.com/G-Core/gcore-go/streaming"  // Streaming services
+    "github.com/G-Core/gcore-go/iam"        // IAM services
+    "github.com/G-Core/gcore-go/option"     // Request options
+)
+```
+
+## Environment Variables
+
+The SDK reads configuration from environment variables by default. This makes it easy to configure your application without hardcoding credentials.
+
+### Required Variables
+
+<CodeGroup>
+
+```bash Linux/macOS
+export GCORE_API_KEY="your-api-key"
+```
+
+```powershell Windows (PowerShell)
+$env:GCORE_API_KEY="your-api-key"
+```
+
+```cmd Windows (CMD)
+set GCORE_API_KEY=your-api-key
+```
+
+</CodeGroup>
+
+### Optional Variables
+
+Depending on which services you're using, you may need to set additional environment variables:
+
+<CodeGroup>
+
+```bash Linux/macOS
+# Cloud-specific configuration
+export GCORE_CLOUD_PROJECT_ID="123456"
+export GCORE_CLOUD_REGION_ID="1"
+
+# Custom API endpoint (optional)
+export GCORE_BASE_URL="https://api.gcore.com"
+```
+
+```powershell Windows (PowerShell)
+# Cloud-specific configuration
+$env:GCORE_CLOUD_PROJECT_ID="123456"
+$env:GCORE_CLOUD_REGION_ID="1"
+
+# Custom API endpoint (optional)
+$env:GCORE_BASE_URL="https://api.gcore.com"
+```
+
+```cmd Windows (CMD)
+REM Cloud-specific configuration
+set GCORE_CLOUD_PROJECT_ID=123456
+set GCORE_CLOUD_REGION_ID=1
+
+REM Custom API endpoint (optional)
+set GCORE_BASE_URL=https://api.gcore.com
+```
+
+</CodeGroup>
+
+### Environment Variable Reference
+
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `GCORE_API_KEY` | Your Gcore API key for authentication | Yes |
+| `GCORE_CLOUD_PROJECT_ID` | Default Cloud project ID (for Cloud services) | Optional |
+| `GCORE_CLOUD_REGION_ID` | Default Cloud region ID (for Cloud services) | Optional |
+| `GCORE_BASE_URL` | Custom API base URL (defaults to production) | Optional |
+
+<Note>
+You can also configure these values programmatically when creating the client, which will override environment variables. See the [Quickstart guide](/quickstart) for examples.
+</Note>
+
+## Verifying Installation
+
+Create a simple test file to verify your installation:
+
+```go test.go
+package main
+
+import (
+    "fmt"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("test-key"),
+    )
+    fmt.Printf("Client initialized successfully: %T\n", client)
+}
+```
+
+Run the test:
+
+```bash
+go run test.go
+```
+
+If you see the output without errors, the SDK is installed correctly:
+
+```
+Client initialized successfully: gcore.Client
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Learn how to make your first API call
+  </Card>
+  <Card title="Authentication" icon="key" href="/authentication">
+    Configure API authentication
+  </Card>
+  <Card title="Core Concepts" icon="book" href="/core-concepts">
+    Understand key SDK concepts
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference">
+    Explore the full API documentation
+  </Card>
+</CardGroup>

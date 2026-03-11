@@ -1,0 +1,82 @@
+---
+title: "Request Fields"
+description: "Learn how to handle request fields in the Gcore Go SDK using omitzero semantics"
+---
+
+## Overview
+
+The Gcore Go SDK uses the [`omitzero`](https://tip.golang.org/doc/go1.24#encodingjsonpkgencodingjson) semantics from the Go 1.24+ `encoding/json` release for request fields.
+
+## Required Fields
+
+Required primitive fields (`int64`, `string`, etc.) feature the tag <code>\`json:"...,required"\`</code>. These fields are always serialized, even their zero values.
+
+## Optional Fields
+
+Optional primitive types are wrapped in a `param.Opt[T]`. These fields can be set with the provided constructors:
+- `gcore.String(string)`
+- `gcore.Int(int64)`
+- And similar constructors for other types
+
+Any `param.Opt[T]`, map, slice, struct or string enum uses the tag <code>\`json:"...,omitzero"\`</code>. Its zero value is considered omitted.
+
+The `param.IsOmitted(any)` function can confirm the presence of any `omitzero` field.
+
+## Basic Example
+
+```go
+p := gcore.ExampleParams{
+	ID:   "id_xxx",            // required property
+	Name: gcore.String("..."), // optional property
+
+	Point: gcore.Point{
+		X: 0,            // required field will serialize as 0
+		Y: gcore.Int(1), // optional field will serialize as 1
+		// ... omitted non-required fields will not be serialized
+	},
+
+	Origin: gcore.Origin{}, // the zero value of [Origin] is considered omitted
+}
+```
+
+## Sending Null Values
+
+<Info>
+Use `param.Null[T]()` for optional fields and `param.NullStruct[T]()` for struct fields when you need to explicitly send `null`.
+</Info>
+
+To send `null` instead of a `param.Opt[T]`, use `param.Null[T]()`.
+To send `null` instead of a struct `T`, use `param.NullStruct[T]()`.
+
+```go
+p.Name = param.Null[string]()       // 'null' instead of string
+p.Point = param.NullStruct[Point]() // 'null' instead of struct
+
+param.IsNull(p.Name)  // true
+param.IsNull(p.Point) // true
+```
+
+## Extra Fields
+
+Request structs contain a `.SetExtraFields(map[string]any)` method which can send non-conforming fields in the request body. Extra fields overwrite any struct fields with a matching key.
+
+<Warning>
+For security reasons, only use `SetExtraFields` with trusted data.
+</Warning>
+
+```go
+// In cases where the API specifies a given type,
+// but you want to send something else, use [SetExtraFields]:
+p.SetExtraFields(map[string]any{
+	"x": 0.01, // send "x" as a float instead of int
+})
+```
+
+## Custom Values with Override
+
+To send a custom value instead of a struct, use `param.Override[T](value)`.
+
+```go
+// Send a number instead of an object
+custom := param.Override[gcore.FooParams](12)
+```

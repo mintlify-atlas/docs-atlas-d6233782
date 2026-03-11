@@ -1,0 +1,88 @@
+---
+title: "Unions"
+description: "Learn how to work with union types in requests and responses in the Gcore Go SDK"
+---
+
+## Request Unions
+
+Unions are represented as a struct with fields prefixed by "Of" for each of its variants, only one field can be non-zero. The non-zero field will be serialized.
+
+Sub-properties of the union can be accessed via methods on the union struct. These methods return a mutable pointer to the underlying data, if present.
+
+### Request Union Structure
+
+```go
+// Only one field can be non-zero, use param.IsOmitted() to check if a field is set
+type AnimalUnionParam struct {
+	OfCat *Cat `json:",omitzero,inline`
+	OfDog *Dog `json:",omitzero,inline`
+}
+```
+
+### Request Union Example
+
+```go
+animal := AnimalUnionParam{
+	OfCat: &Cat{
+		Name: "Whiskers",
+		Owner: PersonParam{
+			Address: AddressParam{Street: "3333 Coyote Hill Rd", Zip: 0},
+		},
+	},
+}
+
+// Mutating a field
+if address := animal.GetOwner().GetAddress(); address != nil {
+	address.ZipCode = 94304
+}
+```
+
+<Note>
+Only one field of the union can be non-zero. Use `param.IsOmitted()` to check if a field is set.
+</Note>
+
+## Response Unions
+
+In responses, unions are represented by a flattened struct containing all possible fields from each of the object variants.
+
+To convert it to a variant use the `.AsFooVariant()` method or the `.AsAny()` method if present.
+
+<Info>
+If a response value union contains primitive values, primitive fields will be alongside the properties but prefixed with `Of` and feature the tag `json:"...,inline"`.
+</Info>
+
+### Response Union Structure
+
+```go
+type AnimalUnion struct {
+	// From variants [Dog], [Cat]
+	Owner Person `json:"owner"`
+	// From variant [Dog]
+	DogBreed string `json:"dog_breed"`
+	// From variant [Cat]
+	CatBreed string `json:"cat_breed"`
+	// ...
+
+	JSON struct {
+		Owner respjson.Field
+		// ...
+	} `json:"-"`
+}
+```
+
+### Response Union Example
+
+```go
+// If animal variant
+if animal.Owner.Address.ZipCode == "" {
+	panic("missing zip code")
+}
+
+// Switch on the variant
+switch variant := animal.AsAny().(type) {
+case Dog:
+case Cat:
+default:
+	panic("unexpected type")
+}
+```

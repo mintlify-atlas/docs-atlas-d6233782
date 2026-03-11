@@ -1,0 +1,764 @@
+---
+title: "Security Rules"
+description: "Manage advanced security rules and rule descriptors for WAAP domains"
+---
+
+## Overview
+
+WAAP security rules provide flexible protection mechanisms using CEL (Common Expression Language) expressions. Rules can be applied at different phases of request/response processing and support multiple action types.
+
+## Rule Types
+
+WAAP supports two main categories of rules:
+
+1. **Advanced Rules** - Domain-specific rules using CEL expressions
+2. **Advanced Rule Descriptors** - Schema definitions for available rule objects and attributes
+
+## Advanced Rules
+
+Advanced rules use CEL syntax to define complex conditions and actions for request/response handling.
+
+### New
+
+Create a new advanced rule for a domain.
+
+#### Method
+
+```go
+func (r *DomainAdvancedRuleService) New(
+    ctx context.Context,
+    domainID int64,
+    body DomainAdvancedRuleNewParams,
+    opts ...option.RequestOption,
+) (*WaapAdvancedRule, error)
+```
+
+#### Parameters
+
+<ParamField path="domainID" type="int64" required>
+  The domain ID
+</ParamField>
+
+<ParamField body="name" type="string" required>
+  The name assigned to the rule
+</ParamField>
+
+<ParamField body="source" type="string" required>
+  A CEL syntax expression containing the rule's conditions
+  
+  Allowed objects: `request`, `whois`, `session`, `response`, `tags`, `user_defined_tags`, `user_agent`, `client_data`
+  
+  Learn more: https://gcore.com/docs/waap/waap-rules/advanced-rules
+</ParamField>
+
+<ParamField body="enabled" type="bool" required>
+  Whether the rule is enabled
+</ParamField>
+
+<ParamField body="action" type="Action" required>
+  The action that the rule takes when triggered. Only one action can be set per rule
+  
+  <ParamField body="allow" type="map[string]any">
+    Allow the request to proceed
+  </ParamField>
+  
+  <ParamField body="block" type="Block">
+    Block the request
+    
+    <ParamField body="status_code" type="int64">
+      Custom HTTP status code: `403`, `405`, `418`, or `429`
+    </ParamField>
+    
+    <ParamField body="action_duration" type="string">
+      How long the block applies to subsequent requests
+      
+      Format: number followed by 's', 'm', 'h', or 'd' (seconds, minutes, hours, days)
+      
+      Example: "5m", "1h", "24h"
+    </ParamField>
+  </ParamField>
+  
+  <ParamField body="captcha" type="map[string]any">
+    Present a CAPTCHA challenge
+  </ParamField>
+  
+  <ParamField body="handshake" type="map[string]any">
+    Perform automatic browser validation
+  </ParamField>
+  
+  <ParamField body="monitor" type="map[string]any">
+    Monitor the request but take no action
+  </ParamField>
+  
+  <ParamField body="tag" type="Tag">
+    Tag the request for tracking
+    
+    <ParamField body="tags" type="[]string" required>
+      List of user-defined tags to apply
+    </ParamField>
+  </ParamField>
+</ParamField>
+
+<ParamField body="description" type="string">
+  Optional description for the rule
+</ParamField>
+
+<ParamField body="phase" type="string">
+  The request/response phase for applying the rule. Default: `access`
+  
+  Available values:
+  - `access` - Modify the request before sending to origin
+  - `header_filter` - Modify response HTTP headers
+  - `body_filter` - Modify response body
+</ParamField>
+
+#### Response
+
+<ResponseField name="id" type="int64" required>
+  The unique identifier for the rule
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The name of the rule
+</ResponseField>
+
+<ResponseField name="source" type="string" required>
+  The CEL expression defining the rule conditions
+</ResponseField>
+
+<ResponseField name="enabled" type="bool" required>
+  Whether the rule is enabled
+</ResponseField>
+
+<ResponseField name="action" type="Action" required>
+  The configured action for this rule
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  The rule description
+</ResponseField>
+
+<ResponseField name="phase" type="string">
+  The processing phase: `access`, `header_filter`, or `body_filter`
+</ResponseField>
+
+#### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/waap"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    // Create a rule to block requests from specific countries
+    rule, err := client.Waap.Domains.AdvancedRules.New(
+        context.Background(),
+        12345, // domain ID
+        waap.DomainAdvancedRuleNewParams{
+            Name:    "Block Suspicious Countries",
+            Source:  "whois.country in ['CN', 'RU']",
+            Enabled: true,
+            Action: waap.DomainAdvancedRuleNewParamsAction{
+                Block: waap.DomainAdvancedRuleNewParamsActionBlock{
+                    StatusCode:     403,
+                    ActionDuration: param.Opt("1h"),
+                },
+            },
+            Description: param.Opt("Block traffic from high-risk countries"),
+            Phase:       waap.DomainAdvancedRuleNewParamsPhaseAccess,
+        },
+    )
+    if err != nil {
+        log.Fatalf("Failed to create rule: %v", err)
+    }
+    
+    fmt.Printf("Created rule ID: %d\n", rule.ID)
+}
+```
+
+```go
+// Create a rule to add custom tags
+rule, err := client.Waap.Domains.AdvancedRules.New(
+    context.Background(),
+    12345,
+    waap.DomainAdvancedRuleNewParams{
+        Name:    "Tag Mobile Users",
+        Source:  "user_agent.is_mobile == true",
+        Enabled: true,
+        Action: waap.DomainAdvancedRuleNewParamsAction{
+            Tag: waap.DomainAdvancedRuleNewParamsActionTag{
+                Tags: []string{"mobile_traffic", "requires_analysis"},
+            },
+        },
+    },
+)
+```
+
+### List
+
+Retrieve a list of advanced rules for a domain with filtering and pagination.
+
+#### Method
+
+```go
+func (r *DomainAdvancedRuleService) List(
+    ctx context.Context,
+    domainID int64,
+    query DomainAdvancedRuleListParams,
+    opts ...option.RequestOption,
+) (*pagination.OffsetPage[WaapAdvancedRule], error)
+```
+
+#### Parameters
+
+<ParamField path="domainID" type="int64" required>
+  The domain ID
+</ParamField>
+
+<ParamField query="limit" type="int64">
+  Number of items to return
+</ParamField>
+
+<ParamField query="offset" type="int64">
+  Number of items to skip
+</ParamField>
+
+<ParamField query="name" type="string">
+  Filter by rule name. Supports '*' wildcard
+</ParamField>
+
+<ParamField query="description" type="string">
+  Filter by description. Supports '*' wildcard
+</ParamField>
+
+<ParamField query="enabled" type="bool">
+  Filter by enabled status
+</ParamField>
+
+<ParamField query="action" type="string">
+  Filter by action type
+  
+  Available values: `allow`, `block`, `captcha`, `handshake`, `monitor`, `tag`
+</ParamField>
+
+<ParamField query="phase" type="string">
+  Filter by processing phase
+  
+  Available values: `access`, `header_filter`, `body_filter`
+</ParamField>
+
+<ParamField query="ordering" type="string">
+  Sort field. Prefix with `-` for descending order
+  
+  Available values: `id`, `name`, `description`, `enabled`, `action`, `phase`, `-id`, `-name`, `-description`, `-enabled`, `-action`, `-phase`
+</ParamField>
+
+#### Example
+
+```go
+// List all enabled block rules
+rules, err := client.Waap.Domains.AdvancedRules.List(
+    context.Background(),
+    12345,
+    waap.DomainAdvancedRuleListParams{
+        Enabled: param.Opt(true),
+        Action:  waap.DomainAdvancedRuleListParamsActionBlock,
+        Limit:   param.Opt(int64(20)),
+    },
+)
+if err != nil {
+    log.Fatalf("Failed to list rules: %v", err)
+}
+
+for _, rule := range rules.Data {
+    fmt.Printf("Rule: %s (ID: %d)\n", rule.Name, rule.ID)
+    fmt.Printf("  Source: %s\n", rule.Source)
+}
+
+// Auto-pagination
+iter := client.Waap.Domains.AdvancedRules.ListAutoPaging(
+    context.Background(),
+    12345,
+    waap.DomainAdvancedRuleListParams{},
+)
+for iter.Next() {
+    rule := iter.Current()
+    fmt.Printf("%s: %s\n", rule.Name, rule.Source)
+}
+```
+
+### Get
+
+Retrieve a specific advanced rule by ID.
+
+#### Method
+
+```go
+func (r *DomainAdvancedRuleService) Get(
+    ctx context.Context,
+    ruleID int64,
+    query DomainAdvancedRuleGetParams,
+    opts ...option.RequestOption,
+) (*WaapAdvancedRule, error)
+```
+
+#### Parameters
+
+<ParamField path="ruleID" type="int64" required>
+  The rule ID
+</ParamField>
+
+<ParamField query="domain_id" type="int64" required>
+  The domain ID
+</ParamField>
+
+#### Example
+
+```go
+rule, err := client.Waap.Domains.AdvancedRules.Get(
+    context.Background(),
+    67890,
+    waap.DomainAdvancedRuleGetParams{
+        DomainID: 12345,
+    },
+)
+if err != nil {
+    log.Fatalf("Failed to get rule: %v", err)
+}
+
+fmt.Printf("Rule: %s\n", rule.Name)
+fmt.Printf("Source: %s\n", rule.Source)
+fmt.Printf("Enabled: %v\n", rule.Enabled)
+```
+
+### Update
+
+Update an existing advanced rule. Only provided properties will be updated.
+
+#### Method
+
+```go
+func (r *DomainAdvancedRuleService) Update(
+    ctx context.Context,
+    ruleID int64,
+    params DomainAdvancedRuleUpdateParams,
+    opts ...option.RequestOption,
+) error
+```
+
+#### Parameters
+
+<ParamField path="ruleID" type="int64" required>
+  The rule ID
+</ParamField>
+
+<ParamField body="domain_id" type="int64" required>
+  The domain ID
+</ParamField>
+
+<ParamField body="name" type="string">
+  Updated rule name
+</ParamField>
+
+<ParamField body="source" type="string">
+  Updated CEL expression
+</ParamField>
+
+<ParamField body="enabled" type="bool">
+  Updated enabled status
+</ParamField>
+
+<ParamField body="description" type="string">
+  Updated description
+</ParamField>
+
+<ParamField body="action" type="Action">
+  Updated action configuration
+</ParamField>
+
+<ParamField body="phase" type="string">
+  Updated processing phase
+</ParamField>
+
+#### Example
+
+```go
+// Update rule to change block duration
+err := client.Waap.Domains.AdvancedRules.Update(
+    context.Background(),
+    67890,
+    waap.DomainAdvancedRuleUpdateParams{
+        DomainID:    12345,
+        Description: param.Opt("Updated block rule with longer duration"),
+        Action: waap.DomainAdvancedRuleUpdateParamsAction{
+            Block: waap.DomainAdvancedRuleUpdateParamsActionBlock{
+                ActionDuration: param.Opt("24h"),
+                StatusCode:     429,
+            },
+        },
+    },
+)
+if err != nil {
+    log.Fatalf("Failed to update rule: %v", err)
+}
+```
+
+### Delete
+
+Delete an advanced rule.
+
+#### Method
+
+```go
+func (r *DomainAdvancedRuleService) Delete(
+    ctx context.Context,
+    ruleID int64,
+    body DomainAdvancedRuleDeleteParams,
+    opts ...option.RequestOption,
+) error
+```
+
+#### Parameters
+
+<ParamField path="ruleID" type="int64" required>
+  The rule ID to delete
+</ParamField>
+
+<ParamField body="domain_id" type="int64" required>
+  The domain ID
+</ParamField>
+
+#### Example
+
+```go
+err := client.Waap.Domains.AdvancedRules.Delete(
+    context.Background(),
+    67890,
+    waap.DomainAdvancedRuleDeleteParams{
+        DomainID: 12345,
+    },
+)
+if err != nil {
+    log.Fatalf("Failed to delete rule: %v", err)
+}
+
+fmt.Println("Rule deleted successfully")
+```
+
+### Toggle
+
+Enable or disable an advanced rule without modifying its configuration.
+
+#### Method
+
+```go
+func (r *DomainAdvancedRuleService) Toggle(
+    ctx context.Context,
+    action DomainAdvancedRuleToggleParamsAction,
+    body DomainAdvancedRuleToggleParams,
+    opts ...option.RequestOption,
+) error
+```
+
+#### Parameters
+
+<ParamField path="action" type="string" required>
+  The toggle action to perform
+  
+  Available values: `enable`, `disable`
+</ParamField>
+
+<ParamField body="domain_id" type="int64" required>
+  The domain ID
+</ParamField>
+
+<ParamField body="rule_id" type="int64" required>
+  The rule ID to toggle
+</ParamField>
+
+#### Example
+
+```go
+// Disable a rule temporarily
+err := client.Waap.Domains.AdvancedRules.Toggle(
+    context.Background(),
+    waap.DomainAdvancedRuleToggleParamsActionDisable,
+    waap.DomainAdvancedRuleToggleParams{
+        DomainID: 12345,
+        RuleID:   67890,
+    },
+)
+if err != nil {
+    log.Fatalf("Failed to disable rule: %v", err)
+}
+
+// Re-enable the rule
+err = client.Waap.Domains.AdvancedRules.Toggle(
+    context.Background(),
+    waap.DomainAdvancedRuleToggleParamsActionEnable,
+    waap.DomainAdvancedRuleToggleParams{
+        DomainID: 12345,
+        RuleID:   67890,
+    },
+)
+```
+
+## Advanced Rule Descriptors
+
+Descriptors provide schema information about available CEL objects and their attributes.
+
+### List Descriptors
+
+Retrieve the advanced rules descriptor schema.
+
+#### Method
+
+```go
+func (r *AdvancedRuleService) List(
+    ctx context.Context,
+    opts ...option.RequestOption,
+) (*WaapAdvancedRuleDescriptorList, error)
+```
+
+#### Response
+
+<ResponseField name="version" type="string" required>
+  The descriptor schema version
+</ResponseField>
+
+<ResponseField name="objects" type="[]Descriptor">
+  List of available CEL objects
+  
+  <ResponseField name="name" type="string">
+    The object's name (e.g., "request", "whois", "session")
+  </ResponseField>
+  
+  <ResponseField name="type" type="string">
+    The object's type
+  </ResponseField>
+  
+  <ResponseField name="description" type="string">
+    Description of the object
+  </ResponseField>
+  
+  <ResponseField name="attrs" type="[]Attr">
+    Available attributes for this object
+    
+    <ResponseField name="name" type="string">
+      Attribute name
+    </ResponseField>
+    
+    <ResponseField name="type" type="string">
+      Attribute type
+    </ResponseField>
+    
+    <ResponseField name="description" type="string">
+      Attribute description
+    </ResponseField>
+    
+    <ResponseField name="hint" type="string">
+      Usage hint
+    </ResponseField>
+    
+    <ResponseField name="args" type="[]Arg">
+      Arguments for the attribute
+      
+      <ResponseField name="name" type="string">
+        Argument name
+      </ResponseField>
+      
+      <ResponseField name="type" type="string">
+        Argument type
+      </ResponseField>
+      
+      <ResponseField name="description" type="string">
+        Argument description
+      </ResponseField>
+    </ResponseField>
+  </ResponseField>
+</ResponseField>
+
+#### Example
+
+```go
+descriptor, err := client.Waap.AdvancedRules.List(context.Background())
+if err != nil {
+    log.Fatalf("Failed to get descriptor: %v", err)
+}
+
+fmt.Printf("Descriptor Version: %s\n", descriptor.Version)
+
+for _, obj := range descriptor.Objects {
+    fmt.Printf("\nObject: %s (%s)\n", obj.Name, obj.Type)
+    if obj.Description != "" {
+        fmt.Printf("  Description: %s\n", obj.Description)
+    }
+    
+    if len(obj.Attrs) > 0 {
+        fmt.Println("  Attributes:")
+        for _, attr := range obj.Attrs {
+            fmt.Printf("    - %s: %s\n", attr.Name, attr.Type)
+            if attr.Description != "" {
+                fmt.Printf("      %s\n", attr.Description)
+            }
+            if attr.Hint != "" {
+                fmt.Printf("      Hint: %s\n", attr.Hint)
+            }
+        }
+    }
+}
+```
+
+## CEL Expression Examples
+
+### Block by Country
+
+```go
+// Block requests from specific countries
+"whois.country in ['CN', 'RU', 'KP']"
+```
+
+### Rate Limiting by IP
+
+```go
+// Block IPs that exceed 100 requests per minute
+"session.rate('1m') > 100"
+```
+
+### User Agent Filtering
+
+```go
+// Block suspicious bots
+"user_agent.is_bot && !user_agent.is_known_bot"
+```
+
+### Path-Based Rules
+
+```go
+// Protect admin endpoints
+"request.path.startsWith('/admin/') && !request.ip in ['1.2.3.4']"
+```
+
+### Method-Based Rules
+
+```go
+// Allow only GET and POST
+"request.method in ['GET', 'POST']"
+```
+
+### Header-Based Rules
+
+```go
+// Require authentication header
+"!request.headers.has('Authorization')"
+```
+
+### Tag-Based Rules
+
+```go
+// Check if request has specific tag
+"'suspicious_activity' in user_defined_tags"
+```
+
+### Complex Conditions
+
+```go
+// Combine multiple conditions
+"whois.country == 'US' && request.path.contains('/api/') && session.rate('1m') < 50"
+```
+
+## Rule Actions Reference
+
+### Allow
+Permits the request to proceed without further inspection.
+
+```go
+Action: waap.DomainAdvancedRuleNewParamsAction{
+    Allow: map[string]any{},
+}
+```
+
+### Block
+Blocks the request with optional status code and duration.
+
+```go
+Action: waap.DomainAdvancedRuleNewParamsAction{
+    Block: waap.DomainAdvancedRuleNewParamsActionBlock{
+        StatusCode:     403, // 403, 405, 418, or 429
+        ActionDuration: param.Opt("1h"),
+    },
+}
+```
+
+### Captcha
+Presents a CAPTCHA challenge to verify human interaction.
+
+```go
+Action: waap.DomainAdvancedRuleNewParamsAction{
+    Captcha: map[string]any{},
+}
+```
+
+### Handshake
+Performs automatic browser validation using JavaScript challenges.
+
+```go
+Action: waap.DomainAdvancedRuleNewParamsAction{
+    Handshake: map[string]any{},
+}
+```
+
+### Monitor
+Logs the event for analysis without blocking.
+
+```go
+Action: waap.DomainAdvancedRuleNewParamsAction{
+    Monitor: map[string]any{},
+}
+```
+
+### Tag
+Adds custom tags to requests for tracking and analytics.
+
+```go
+Action: waap.DomainAdvancedRuleNewParamsAction{
+    Tag: waap.DomainAdvancedRuleNewParamsActionTag{
+        Tags: []string{"high_risk", "requires_review"},
+    },
+}
+```
+
+## Processing Phases
+
+### Access Phase (Default)
+Applied before the request reaches the origin server. Use for:
+- Request filtering and blocking
+- Rate limiting
+- Authentication checks
+- Request modification
+
+### Header Filter Phase
+Applied to response headers before sending to the client. Use for:
+- Security header injection
+- Header modification
+- Response classification
+
+### Body Filter Phase
+Applied to the response body before sending to the client. Use for:
+- Content filtering
+- Response modification
+- Data sanitization
+
+<Note>
+  Most rules should use the default `access` phase. Use `header_filter` and `body_filter` only when you need to inspect or modify responses.
+</Note>

@@ -1,0 +1,167 @@
+---
+title: "Introduction"
+description: "Welcome to the Gcore Go SDK documentation"
+---
+
+## What is the Gcore Go SDK?
+
+The Gcore Go SDK is the official Go library for interacting with the [Gcore API](https://api.gcore.com/docs). It provides a type-safe, idiomatic Go interface for managing cloud infrastructure, CDN resources, DNS, object storage, video streaming, and more.
+
+The SDK is automatically generated from Gcore's OpenAPI specifications using [Stainless](https://www.stainless.com/), ensuring it stays up-to-date with the latest API features.
+
+## Why Use the Go SDK?
+
+<CardGroup cols={2}>
+  <Card title="Type Safety" icon="shield-check">
+    Compile-time type checking catches errors before runtime
+  </Card>
+  <Card title="IDE Support" icon="code">
+    Full autocomplete and inline documentation in your editor
+  </Card>
+  <Card title="Idiomatic Go" icon="go">
+    Follows Go best practices and conventions
+  </Card>
+  <Card title="Production Ready" icon="rocket">
+    Built-in retries, error handling, and pagination
+  </Card>
+</CardGroup>
+
+## Core Features
+
+### Automatic Pagination
+
+Work with large datasets effortlessly using built-in pagination support:
+
+```go
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+	Limit: gcore.Int(10),
+})
+// Automatically fetches more pages as needed
+for iter.Next() {
+	project := iter.Current()
+	fmt.Printf("%+v\n", project)
+}
+if err := iter.Err(); err != nil {
+	panic(err.Error())
+}
+```
+
+### Error Handling
+
+Rich error types with detailed request and response information:
+
+```go
+_, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+	Name: "my-project",
+})
+if err != nil {
+	var apierr *gcore.Error
+	if errors.As(err, &apierr) {
+		println(string(apierr.DumpRequest(true)))  // Prints the serialized HTTP request
+		println(string(apierr.DumpResponse(true))) // Prints the serialized HTTP response
+	}
+	panic(err.Error()) // GET "/cloud/v1/projects": 400 Bad Request { ... }
+}
+```
+
+### Request Options
+
+Customize requests with flexible options:
+
+```go
+client := gcore.NewClient(
+	option.WithAPIKey("your-api-key"),
+	option.WithMaxRetries(5),
+	option.WithHeader("X-Custom-Header", "value"),
+)
+
+// Override options per-request
+client.Cloud.Projects.New(
+	context.TODO(),
+	params,
+	option.WithRequestTimeout(20*time.Second),
+)
+```
+
+### Middleware Support
+
+Add custom middleware for logging, metrics, or request modification:
+
+```go
+func Logger(req *http.Request, next option.MiddlewareNext) (res *http.Response, err error) {
+	start := time.Now()
+	LogReq(req)
+	
+	res, err = next(req)
+	
+	end := time.Now()
+	LogRes(res, err, start - end)
+	
+	return res, err
+}
+
+client := gcore.NewClient(
+	option.WithMiddleware(Logger),
+)
+```
+
+## What Can You Build?
+
+The Gcore Go SDK enables you to build a wide range of applications:
+
+- **Infrastructure as Code**: Provision and manage cloud resources programmatically
+- **CI/CD Pipelines**: Automate deployment workflows with Gcore infrastructure
+- **Monitoring Tools**: Build custom monitoring and alerting systems
+- **Content Management**: Automate CDN configuration and cache management
+- **Video Platforms**: Integrate live and on-demand video streaming
+- **DNS Automation**: Manage DNS records and zones dynamically
+- **Storage Solutions**: Build applications on top of S3-compatible object storage
+
+## Getting Started
+
+Ready to start building? Follow these steps:
+
+<Steps>
+  <Step title="Install the SDK">
+    Add the Gcore Go SDK to your project using `go get`
+    
+    ```bash
+    go get github.com/G-Core/gcore-go
+    ```
+  </Step>
+  
+  <Step title="Get Your API Key">
+    Sign up for a Gcore account and generate an API key from the dashboard
+  </Step>
+  
+  <Step title="Write Your First Request">
+    Create a client and make your first API call
+    
+    ```go
+    client := gcore.NewClient(
+    	option.WithAPIKey("your-api-key"),
+    )
+    ```
+  </Step>
+</Steps>
+
+<Card title="Continue to Installation" icon="arrow-right" href="/installation">
+  Learn how to install and configure the SDK
+</Card>
+
+## Support and Resources
+
+<CardGroup cols={2}>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/G-Core/gcore-go">
+    View source code, report issues, and contribute
+  </Card>
+  <Card title="API Documentation" icon="book" href="https://api.gcore.com/docs">
+    Official Gcore API reference
+  </Card>
+  <Card title="Examples" icon="code" href="https://github.com/G-Core/gcore-go/tree/main/examples">
+    Browse code examples and usage patterns
+  </Card>
+  <Card title="Changelog" icon="list" href="https://github.com/G-Core/gcore-go/blob/main/CHANGELOG.md">
+    Stay updated with the latest changes
+  </Card>
+</CardGroup>

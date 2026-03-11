@@ -1,0 +1,368 @@
+---
+title: "Broadcasts"
+description: "Combine multiple live streams with advertising and custom player configuration"
+---
+
+## Overview
+
+Broadcasts provide a way to configure an HTML video player that combines multiple live streams with advertising and custom design. This is useful when using Gcore's built-in player.
+
+<Note>
+  If you're using direct .m3u8/.mpd links with external players, you may not need the Broadcast entity.
+</Note>
+
+<Warning>
+  The Broadcast feature is being replaced by "Multicamera" in a future update.
+</Warning>
+
+## Broadcast Object
+
+<ResponseField name="name" type="string" required>
+  Broadcast name for identification
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Broadcast status that controls what viewers see:
+  - `pending`: Show "Broadcast isn't started yet" or custom message
+  - `live`: Broadcast is live, viewers can watch
+  - `paused`: Show "Broadcast is paused" message
+  - `finished`: Show "Broadcast is finished" message
+  
+  Status changes are reflected immediately in viewers' browsers.
+</ResponseField>
+
+<ResponseField name="stream_ids" type="array">
+  Array of stream IDs to include in this broadcast
+</ResponseField>
+
+<ResponseField name="player_id" type="int64">
+  ID of custom player to use. If empty, default player is used.
+</ResponseField>
+
+<ResponseField name="ad_id" type="int64">
+  ID of advertisement to display. If empty, default ad is shown. If no default, no ad is shown.
+</ResponseField>
+
+<ResponseField name="poster" type="string">
+  URL to uploaded poster image displayed before broadcast starts
+</ResponseField>
+
+<ResponseField name="pending_message" type="string">
+  Custom message shown when status is `pending`. If empty, default message is displayed.
+</ResponseField>
+
+<ResponseField name="custom_iframe_url" type="string">
+  Custom iframe URL shared via player's sharing button. Auto-generated URL used by default.
+</ResponseField>
+
+<ResponseField name="share_url" type="string">
+  Custom URL or iframe in sharing link field. If empty, sharing is disabled.
+</ResponseField>
+
+<ResponseField name="show_dvr_after_finish" type="bool">
+  Whether to show DVR recording after broadcast finishes:
+  - `true`: Recording is shown
+  - `false`: Recording is not shown (default)
+</ResponseField>
+
+## Create Broadcast
+
+Create a new broadcast combining multiple streams.
+
+```go broadcast.go
+broadcast, err := client.Streaming.Broadcasts.New(context.TODO(), streaming.BroadcastNewParams{
+    Broadcast: streaming.BroadcastNewParamsBroadcast{
+        Name:      "Live Conference 2024",
+        Status:    gcore.String("pending"),
+        StreamIDs: []int64{12345, 12346},
+        PlayerID:  gcore.Int64(100),
+    },
+})
+```
+
+<ParamField path="broadcast.name" type="string" required>
+  Broadcast name
+</ParamField>
+
+<ParamField path="broadcast.status" type="string">
+  Initial status: `pending`, `live`, `paused`, or `finished`
+</ParamField>
+
+<ParamField path="broadcast.stream_ids" type="array">
+  Array of stream IDs to include
+</ParamField>
+
+<ParamField path="broadcast.player_id" type="int64">
+  Custom player ID. Leave empty for default player.
+</ParamField>
+
+<ParamField path="broadcast.ad_id" type="int64">
+  Advertisement ID to display
+</ParamField>
+
+<ParamField path="broadcast.poster" type="string">
+  Poster image (base64 or URL)
+</ParamField>
+
+<ParamField path="broadcast.pending_message" type="string">
+  Custom message for pending status
+</ParamField>
+
+<ParamField path="broadcast.custom_iframe_url" type="string">
+  Custom iframe URL for sharing
+</ParamField>
+
+<ParamField path="broadcast.share_url" type="string">
+  Custom sharing URL
+</ParamField>
+
+<ParamField path="broadcast.show_dvr_after_finish" type="bool">
+  Show DVR after broadcast ends. Default: false
+</ParamField>
+
+## Update Broadcast
+
+Update broadcast configuration, typically to change status or modify streams.
+
+```go broadcast.go
+// Start the broadcast
+broadcast, err := client.Streaming.Broadcasts.Update(
+    context.TODO(),
+    broadcastID,
+    streaming.BroadcastUpdateParams{
+        Broadcast: streaming.BroadcastUpdateParamsBroadcast{
+            Name:   "Live Conference 2024",
+            Status: gcore.String("live"),
+        },
+    },
+)
+
+// Later, finish the broadcast
+broadcast, err = client.Streaming.Broadcasts.Update(
+    context.TODO(),
+    broadcastID,
+    streaming.BroadcastUpdateParams{
+        Broadcast: streaming.BroadcastUpdateParamsBroadcast{
+            Name:   "Live Conference 2024",
+            Status: gcore.String("finished"),
+        },
+    },
+)
+```
+
+## Get Broadcast
+
+Retrieve broadcast details.
+
+```go broadcast.go
+broadcast, err := client.Streaming.Broadcasts.Get(context.TODO(), broadcastID)
+
+fmt.Printf("Broadcast: %s\n", broadcast.Name)
+fmt.Printf("Status: %s\n", broadcast.Status)
+fmt.Printf("Streams: %v\n", broadcast.StreamIDs)
+```
+
+## List Broadcasts
+
+Retrieve a paginated list of broadcasts.
+
+```go broadcast.go
+page, err := client.Streaming.Broadcasts.List(context.TODO(), streaming.BroadcastListParams{
+    Page: gcore.Int64(1),
+})
+
+for _, broadcast := range page.Items {
+    fmt.Printf("%s - Status: %s\n", broadcast.Name, broadcast.Status)
+}
+
+// Auto-pagination
+autoPager := client.Streaming.Broadcasts.ListAutoPaging(context.TODO(), streaming.BroadcastListParams{})
+for autoPager.Next() {
+    broadcast := autoPager.Current()
+    fmt.Printf("%s\n", broadcast.Name)
+}
+```
+
+## Delete Broadcast
+
+Delete a broadcast configuration.
+
+```go broadcast.go
+err := client.Streaming.Broadcasts.Delete(context.TODO(), broadcastID)
+```
+
+<Note>
+  Deleting a broadcast does not delete the associated streams.
+</Note>
+
+## Get Spectators Count
+
+Get the current number of simultaneous viewers.
+
+```go broadcast.go
+count, err := client.Streaming.Broadcasts.GetSpectatorsCount(context.TODO(), broadcastID)
+
+fmt.Printf("Current viewers: %d\n", count.SpectatorsCount)
+```
+
+<ResponseField name="spectators_count" type="int64">
+  Number of simultaneous viewers at the current moment
+</ResponseField>
+
+## Usage Patterns
+
+### Simple Single-Stream Broadcast
+
+```go broadcast.go
+// Create stream first
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:   "Main Stream",
+    Active: gcore.Bool(true),
+})
+
+// Create broadcast
+broadcast, err := client.Streaming.Broadcasts.New(context.TODO(), streaming.BroadcastNewParams{
+    Broadcast: streaming.BroadcastNewParamsBroadcast{
+        Name:           "My Event",
+        Status:         gcore.String("pending"),
+        StreamIDs:      []int64{stream.ID},
+        PendingMessage: gcore.String("Event starts at 3:00 PM EST"),
+    },
+})
+
+// When ready to go live
+client.Streaming.Broadcasts.Update(
+    context.TODO(),
+    broadcast.ID,
+    streaming.BroadcastUpdateParams{
+        Broadcast: streaming.BroadcastUpdateParamsBroadcast{
+            Name:   "My Event",
+            Status: gcore.String("live"),
+        },
+    },
+)
+```
+
+### Multi-Stream Broadcast (Multiple Camera Angles)
+
+```go broadcast.go
+// Create multiple streams
+stream1, _ := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name: "Camera 1 - Main Stage",
+})
+
+stream2, _ := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name: "Camera 2 - Audience",
+})
+
+stream3, _ := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name: "Camera 3 - Backstage",
+})
+
+// Combine in broadcast
+broadcast, err := client.Streaming.Broadcasts.New(context.TODO(), streaming.BroadcastNewParams{
+    Broadcast: streaming.BroadcastNewParamsBroadcast{
+        Name:      "Multi-Camera Event",
+        Status:    gcore.String("live"),
+        StreamIDs: []int64{stream1.ID, stream2.ID, stream3.ID},
+    },
+})
+```
+
+### Broadcast with Custom Player and Ads
+
+```go broadcast.go
+// Create custom player first
+player, _ := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:     "Branded Player",
+        Logo:     gcore.String("https://example.com/logo.png"),
+        BgColor:  gcore.String("#000000"),
+        FgColor:  gcore.String("#FF0000"),
+        Autoplay: gcore.Bool(true),
+    },
+})
+
+// Create broadcast with custom player and ad
+broadcast, err := client.Streaming.Broadcasts.New(context.TODO(), streaming.BroadcastNewParams{
+    Broadcast: streaming.BroadcastNewParamsBroadcast{
+        Name:      "Branded Broadcast",
+        StreamIDs: []int64{streamID},
+        PlayerID:  gcore.Int64(player.ID),
+        AdID:      gcore.Int64(adID),
+    },
+})
+```
+
+### Live Event with DVR Replay After Finish
+
+```go broadcast.go
+broadcast, err := client.Streaming.Broadcasts.New(context.TODO(), streaming.BroadcastNewParams{
+    Broadcast: streaming.BroadcastNewParamsBroadcast{
+        Name:               "Sports Event",
+        Status:             gcore.String("live"),
+        StreamIDs:          []int64{streamID},
+        ShowDvrAfterFinish: gcore.Bool(true),
+    },
+})
+
+// When event ends, viewers can still watch the DVR recording
+client.Streaming.Broadcasts.Update(
+    context.TODO(),
+    broadcast.ID,
+    streaming.BroadcastUpdateParams{
+        Broadcast: streaming.BroadcastUpdateParamsBroadcast{
+            Name:   "Sports Event",
+            Status: gcore.String("finished"),
+        },
+    },
+)
+```
+
+## Status Management Best Practices
+
+### Pre-Event Setup
+1. Create broadcast with `status: pending`
+2. Set custom `pending_message` with event details
+3. Configure `poster` image
+4. Test stream connectivity
+
+### Going Live
+1. Verify streams are live (check `stream.live` status)
+2. Update broadcast `status` to `live`
+3. Monitor viewer count with `GetSpectatorsCount()`
+
+### During Event
+- Use `status: paused` for intermissions
+- Update `stream_ids` to switch camera angles
+- Monitor stream health
+
+### Post-Event
+1. Set `status: finished`
+2. If `show_dvr_after_finish: true`, viewers can replay
+3. Export recording if needed
+
+## Diagram
+
+```
+┌─────────────┐      ┌─────────────┐      ┌─────────────┐
+│  Stream 1   │      │  Stream 2   │      │  Stream 3   │
+│  (RTMP)     │      │  (SRT)      │      │  (WebRTC)   │
+└──────┬──────┘      └──────┬──────┘      └──────┬──────┘
+       │                    │                    │
+       └────────────────────┼────────────────────┘
+                            │
+                    ┌───────▼────────┐
+                    │   Broadcast    │
+                    │  (Combining)   │
+                    └───────┬────────┘
+                            │
+                    ┌───────▼────────┐
+                    │  Custom Player │
+                    │   + Ads        │
+                    └───────┬────────┘
+                            │
+                    ┌───────▼────────┐
+                    │    Viewers     │
+                    └────────────────┘
+```

@@ -1,0 +1,224 @@
+---
+title: Client Configuration
+description: Learn how to configure the Gcore Go SDK client with various options
+---
+
+## Creating a New Client
+
+The Gcore Go SDK uses the `NewClient()` function to initialize a client instance. The client is the main entry point for interacting with the Gcore API.
+
+<CodeGroup>
+```go Basic Client
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("My API Key"),
+    )
+}
+```
+
+```go Client with Multiple Options
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("My API Key"),
+        option.WithMaxRetries(5),
+        option.WithHeader("X-Custom-Header", "value"),
+    )
+}
+```
+</CodeGroup>
+
+## Default Client Options
+
+The `DefaultClientOptions()` function reads configuration from environment variables and returns default options:
+
+- **GCORE_API_KEY**: API key for authentication
+- **GCORE_CLOUD_PROJECT_ID**: Default project ID for cloud operations
+- **GCORE_CLOUD_REGION_ID**: Default region ID for cloud operations
+- **GCORE_BASE_URL**: Custom API base URL (defaults to `https://api.gcore.com/`)
+
+<CodeGroup>
+```go Using DefaultClientOptions
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    // NewClient automatically calls DefaultClientOptions()
+    client := gcore.NewClient()
+    
+    // You can also explicitly use it and add custom options
+    opts := gcore.DefaultClientOptions()
+    opts = append(opts, option.WithMaxRetries(3))
+    client = gcore.NewClient(opts...)
+}
+```
+
+```bash Environment Variables
+export GCORE_API_KEY="your-api-key"
+export GCORE_CLOUD_PROJECT_ID="12345"
+export GCORE_CLOUD_REGION_ID="67890"
+export GCORE_BASE_URL="https://api.gcore.com/"
+```
+</CodeGroup>
+
+<Note>
+The `NewClient()` function automatically applies `DefaultClientOptions()` before applying any custom options you provide. This means environment variables are always read first, and your custom options will override them.
+</Note>
+
+## Client-Level vs Request-Level Options
+
+Options can be applied at two levels:
+
+### Client-Level Options
+
+Applied when creating the client and affect all requests:
+
+```go
+client := gcore.NewClient(
+    option.WithAPIKey("My API Key"),
+    option.WithMaxRetries(5),
+    option.WithHeader("X-Custom-Header", "global-value"),
+)
+```
+
+### Request-Level Options
+
+Applied to individual requests and override client-level options:
+
+```go
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    cloud.ProjectNewParams{
+        Name: "my-project",
+    },
+    // Override client-level header
+    option.WithHeader("X-Custom-Header", "request-specific-value"),
+    // Override client-level retry setting
+    option.WithMaxRetries(10),
+)
+```
+
+<Tip>
+Request-level options are useful when you need to customize behavior for specific API calls without affecting the entire client configuration.
+</Tip>
+
+## Available Configuration Options
+
+The `option` package provides numerous configuration options:
+
+### Base Configuration
+
+| Option | Description |
+|--------|-------------|
+| `WithBaseURL(url)` | Set a custom API base URL |
+| `WithEnvironmentProduction()` | Use production environment (default) |
+| `WithAPIKey(key)` | Set API key for authentication |
+
+### HTTP Configuration
+
+| Option | Description |
+|--------|-------------|
+| `WithHTTPClient(client)` | Use a custom HTTP client |
+| `WithRequestTimeout(duration)` | Set per-retry timeout |
+| `WithMaxRetries(count)` | Configure maximum retry attempts (default: 2) |
+
+### Headers and Query Parameters
+
+| Option | Description |
+|--------|-------------|
+| `WithHeader(key, value)` | Set or overwrite a header |
+| `WithHeaderAdd(key, value)` | Add a header value |
+| `WithHeaderDel(key)` | Delete a header |
+| `WithQuery(key, value)` | Set or overwrite a query parameter |
+| `WithQueryAdd(key, value)` | Add a query parameter |
+| `WithQueryDel(key)` | Delete a query parameter |
+
+### Request Body Manipulation
+
+| Option | Description |
+|--------|-------------|
+| `WithJSONSet(path, value)` | Set a JSON field using sjson syntax |
+| `WithJSONDel(path)` | Delete a JSON field using sjson syntax |
+| `WithRequestBody(contentType, body)` | Provide custom request body |
+
+### Cloud-Specific Options
+
+| Option | Description |
+|--------|-------------|
+| `WithCloudProjectID(id)` | Set project ID for cloud operations |
+| `WithCloudRegionID(id)` | Set region ID for cloud operations |
+| `WithCloudPollingIntervalSeconds(seconds)` | Set polling interval (default: 3) |
+| `WithCloudPollingTimeoutSeconds(seconds)` | Set polling timeout (default: 7200) |
+
+### Advanced Options
+
+| Option | Description |
+|--------|-------------|
+| `WithMiddleware(middleware...)` | Apply custom middleware |
+| `WithResponseInto(dst)` | Capture raw HTTP response |
+| `WithResponseBodyInto(dst)` | Capture response body |
+| `WithDebugLog(logger)` | Enable debug logging |
+
+## Example: Complete Configuration
+
+```go
+package main
+
+import (
+    "net/http"
+    "time"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    // Custom HTTP client with timeout
+    httpClient := &http.Client{
+        Timeout: 30 * time.Second,
+    }
+    
+    client := gcore.NewClient(
+        // Authentication
+        option.WithAPIKey("your-api-key"),
+        
+        // Cloud configuration
+        option.WithCloudProjectID(12345),
+        option.WithCloudRegionID(67890),
+        
+        // HTTP configuration
+        option.WithHTTPClient(httpClient),
+        option.WithMaxRetries(3),
+        option.WithRequestTimeout(20 * time.Second),
+        
+        // Custom headers
+        option.WithHeader("X-Custom-Header", "value"),
+        
+        // Enable debug logging
+        option.WithDebugLog(nil), // uses default logger
+    )
+    
+    // Use the client...
+}
+```
+
+<Warning>
+When using `WithBaseURL()`, ensure the URL is from a trusted source for security reasons.
+</Warning>

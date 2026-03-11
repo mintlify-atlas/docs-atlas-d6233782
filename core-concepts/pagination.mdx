@@ -1,0 +1,515 @@
+---
+title: Pagination
+description: Learn how to work with paginated API responses in the Gcore Go SDK
+---
+
+## Overview
+
+The Gcore Go SDK provides two convenient ways to handle paginated list endpoints:
+
+1. **Automatic Pagination** - `ListAutoPaging()` automatically fetches all pages
+2. **Manual Pagination** - `List()` and `GetNextPage()` for manual control
+
+## Automatic Pagination
+
+The `ListAutoPaging()` method returns an iterator that automatically fetches additional pages as needed:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(10),
+    })
+    
+    // Automatically fetches more pages as needed
+    for iter.Next() {
+        project := iter.Current()
+        fmt.Printf("Project ID: %d, Name: %s\n", project.ID, project.Name)
+    }
+    
+    if err := iter.Err(); err != nil {
+        panic(err.Error())
+    }
+}
+```
+
+### Iterator Methods
+
+The auto-paging iterator provides the following methods:
+
+| Method | Description |
+|--------|-------------|
+| `Next()` | Advances to the next item, fetching new pages as needed. Returns `false` when done. |
+| `Current()` | Returns the current item |
+| `Err()` | Returns any error that occurred during iteration |
+| `Index()` | Returns the current iteration count (total items processed) |
+
+### Complete Auto-Paging Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(25),
+    })
+    
+    count := 0
+    for iter.Next() {
+        project := iter.Current()
+        count++
+        fmt.Printf("[%d] Project: %s (ID: %d)\n", iter.Index(), project.Name, project.ID)
+    }
+    
+    if err := iter.Err(); err != nil {
+        panic(err.Error())
+    }
+    
+    fmt.Printf("\nTotal projects: %d\n", count)
+}
+```
+
+<Tip>
+Use `ListAutoPaging()` when you need to process all items without worrying about pagination logic. The SDK handles fetching additional pages transparently.
+</Tip>
+
+## Manual Pagination
+
+For more control over pagination, use the `List()` method with `GetNextPage()`:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    page, err := client.Cloud.Projects.List(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(10),
+    })
+    if err != nil {
+        panic(err.Error())
+    }
+    
+    for page != nil {
+        for _, project := range page.Results {
+            fmt.Printf("Project: %s (ID: %d)\n", project.Name, project.ID)
+        }
+        
+        page, err = page.GetNextPage()
+        if err != nil {
+            panic(err.Error())
+        }
+    }
+}
+```
+
+### Page Object Structure
+
+The page object returned by `List()` contains:
+
+```go
+type OffsetPage[T any] struct {
+    Results []T   // The items in this page
+    Count   int64 // Total count of all items across all pages
+}
+```
+
+### GetNextPage() Behavior
+
+The `GetNextPage()` method:
+
+- Returns `nil` when there are no more pages (no error)
+- Automatically calculates the next offset based on current results
+- Returns an error if the API request fails
+
+<CodeGroup>
+```go Manual Pagination
+page, err := client.Cloud.Projects.List(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(10),
+})
+
+for page != nil {
+    // Process current page
+    for _, project := range page.Results {
+        fmt.Printf("%+v\n", project)
+    }
+    
+    // Fetch next page
+    page, err = page.GetNextPage()
+    if err != nil {
+        panic(err.Error())
+    }
+}
+```
+
+```go With Page Counter
+page, err := client.Cloud.Projects.List(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(10),
+})
+
+pageNum := 1
+for page != nil {
+    fmt.Printf("=== Page %d ===", pageNum)
+    
+    for _, project := range page.Results {
+        fmt.Printf("%+v\n", project)
+    }
+    
+    page, err = page.GetNextPage()
+    if err != nil {
+        panic(err.Error())
+    }
+    pageNum++
+}
+```
+</CodeGroup>
+
+<Note>
+`GetNextPage()` returns `nil` (not an error) when there are no more pages. Always check both the page and error.
+</Note>
+
+## Using the Limit Parameter
+
+The `Limit` parameter controls how many items are returned per page:
+
+```go
+import "github.com/G-Core/gcore-go"
+
+// Small pages (useful for UI pagination)
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(10),
+})
+
+// Large pages (more efficient for batch processing)
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(100),
+})
+
+// No limit specified (uses API default)
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{})
+```
+
+### Choosing the Right Limit
+
+| Use Case | Recommended Limit |
+|----------|------------------|
+| UI pagination | 10-25 |
+| Batch processing | 50-100 |
+| Export/reporting | 100+ |
+| Real-time updates | 10-20 |
+
+<Warning>
+Very large limit values may cause requests to timeout or consume excessive memory. Test with your specific data to find the optimal value.
+</Warning>
+
+## Real-World Examples
+
+### Example 1: Process All Projects
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    // Process all projects across all pages
+    iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(50),
+    })
+    
+    var totalProjects int
+    for iter.Next() {
+        project := iter.Current()
+        
+        // Process each project
+        if err := processProject(project); err != nil {
+            fmt.Printf("Error processing project %d: %s\n", project.ID, err)
+            continue
+        }
+        
+        totalProjects++
+    }
+    
+    if err := iter.Err(); err != nil {
+        panic(err.Error())
+    }
+    
+    fmt.Printf("Processed %d projects\n", totalProjects)
+}
+
+func processProject(project *cloud.Project) error {
+    // Your processing logic here
+    return nil
+}
+```
+
+### Example 2: Manual Pagination with Progress
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    page, err := client.Cloud.Projects.List(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(25),
+    })
+    if err != nil {
+        panic(err.Error())
+    }
+    
+    totalCount := page.Count
+    processed := 0
+    
+    for page != nil {
+        for _, project := range page.Results {
+            processed++
+            progress := float64(processed) / float64(totalCount) * 100
+            
+            fmt.Printf("[%.1f%%] Processing project: %s\n", progress, project.Name)
+            // Process project...
+        }
+        
+        page, err = page.GetNextPage()
+        if err != nil {
+            panic(err.Error())
+        }
+    }
+    
+    fmt.Printf("Completed: %d/%d projects\n", processed, totalCount)
+}
+```
+
+### Example 3: Early Termination
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    // Find first project matching a condition
+    iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(50),
+    })
+    
+    for iter.Next() {
+        project := iter.Current()
+        
+        if project.Name == "production" {
+            fmt.Printf("Found production project: %d\n", project.ID)
+            break // Stop iterating
+        }
+    }
+    
+    if err := iter.Err(); err != nil {
+        panic(err.Error())
+    }
+}
+```
+
+### Example 4: Collecting All Results
+
+```go
+package main
+
+import (
+    "context"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func getAllProjects(client *gcore.Client) ([]*cloud.Project, error) {
+    iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+        Limit: gcore.Int(100),
+    })
+    
+    var projects []*cloud.Project
+    for iter.Next() {
+        project := iter.Current()
+        projects = append(projects, project)
+    }
+    
+    if err := iter.Err(); err != nil {
+        return nil, err
+    }
+    
+    return projects, nil
+}
+```
+
+<Tip>
+When collecting all results in memory, be mindful of the total number of items. For very large datasets, process items as you iterate instead of storing them all.
+</Tip>
+
+## Pagination Internals
+
+The SDK uses offset-based pagination:
+
+```go
+// First page (offset=0, limit=10)
+page, err := client.Cloud.Projects.List(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(10),
+})
+// Returns items 0-9
+
+// GetNextPage() automatically calculates offset=10
+page, err = page.GetNextPage()
+// Returns items 10-19
+```
+
+From the source code:
+
+```go
+func (r *OffsetPage[T]) GetNextPage() (res *OffsetPage[T], err error) {
+    if len(r.Results) == 0 {
+        return nil, nil
+    }
+    
+    // Calculate next offset
+    offset := getCurrentOffset() // current offset
+    length := int64(len(r.Results))
+    next := offset + length
+    
+    if next < r.Count && next != 0 {
+        // Fetch next page with new offset
+        return fetchPage(next)
+    }
+    
+    return nil, nil
+}
+```
+
+## Best Practices
+
+### 1. Use Auto-Paging When Possible
+
+```go
+// ✅ Good - Simple and clean
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), params)
+for iter.Next() {
+    project := iter.Current()
+    // Process project
+}
+
+// ❌ Avoid - More complex for no benefit
+page, _ := client.Cloud.Projects.List(context.TODO(), params)
+for page != nil {
+    for _, project := range page.Results {
+        // Process project
+    }
+    page, _ = page.GetNextPage()
+}
+```
+
+### 2. Always Check for Errors
+
+```go
+// ✅ Good
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), params)
+for iter.Next() {
+    // Process...
+}
+if err := iter.Err(); err != nil {
+    return err
+}
+
+// ❌ Bad - Missing error check
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), params)
+for iter.Next() {
+    // Process...
+}
+```
+
+### 3. Use Appropriate Limit Values
+
+```go
+// ✅ Good - Reasonable limit
+params := cloud.ProjectListParams{
+    Limit: gcore.Int(50),
+}
+
+// ❌ Bad - Too small (many requests)
+params := cloud.ProjectListParams{
+    Limit: gcore.Int(1),
+}
+
+// ❌ Bad - Too large (may timeout)
+params := cloud.ProjectListParams{
+    Limit: gcore.Int(10000),
+}
+```
+
+### 4. Handle Context Cancellation
+
+```go
+import "time"
+
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+
+iter := client.Cloud.Projects.ListAutoPaging(ctx, params)
+for iter.Next() {
+    select {
+    case <-ctx.Done():
+        return ctx.Err()
+    default:
+        project := iter.Current()
+        // Process...
+    }
+}
+```

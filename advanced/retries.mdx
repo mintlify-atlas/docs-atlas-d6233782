@@ -1,0 +1,57 @@
+---
+title: "Retries"
+description: "Learn how to configure automatic retry behavior in the Gcore Go SDK"
+---
+
+## Overview
+
+Certain errors will be automatically retried 2 times by default, with a short exponential backoff.
+
+## Default Retry Behavior
+
+By default, the SDK retries all:
+- Connection errors
+- 408 Request Timeout
+- 409 Conflict
+- 429 Rate Limit
+- ≥500 Internal errors
+
+<Info>
+The default number of retries is 2, with a short exponential backoff between attempts.
+</Info>
+
+## Configuring Retries
+
+You can use the `WithMaxRetries` option to configure or disable automatic retries.
+
+### Configure Default Retries for All Requests
+
+```go
+// Configure the default for all requests:
+client := gcore.NewClient(
+	option.WithMaxRetries(0), // default is 2
+)
+```
+
+### Override Retries Per Request
+
+```go
+// Override per-request:
+client.Cloud.Projects.New(
+	context.TODO(),
+	cloud.ProjectNewParams{
+		Name: "my-project",
+	},
+	option.WithMaxRetries(5),
+)
+```
+
+<Note>
+Setting `WithMaxRetries(0)` will disable automatic retries completely.
+</Note>
+
+## Best Practices
+
+- Use higher retry counts for operations that are naturally idempotent
+- Consider disabling retries for time-sensitive operations
+- Combine with [timeout configuration](/advanced/timeouts) to control overall request duration

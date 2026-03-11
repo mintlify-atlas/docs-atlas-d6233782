@@ -1,0 +1,413 @@
+---
+title: 'Security Groups'
+description: 'Manage virtual firewall rules for controlling network traffic to cloud resources'
+---
+
+Security groups act as virtual firewalls controlling inbound and outbound traffic for instances and other resources.
+
+## Methods
+
+### New
+
+Create a new security group with rules.
+
+```go
+func (r *SecurityGroupService) New(ctx context.Context, params SecurityGroupNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *SecurityGroupService) NewAndPoll(ctx context.Context, params SecurityGroupNewParams, opts ...option.RequestOption) (*SecurityGroup, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Security group name
+</ParamField>
+
+<ParamField path="description" type="string">
+  Security group description
+</ParamField>
+
+<ParamField path="rules" type="[]Rule">
+  Initial security group rules. If not provided, default egress rules are created. Set to empty array for no rules
+</ParamField>
+
+<ParamField path="tags" type="map[string]string">
+  Key-value tags
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Security group UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Security group name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Description
+</ResponseField>
+
+<ResponseField name="security_group_rules" type="[]SecurityGroupRule">
+  List of rules in the security group
+</ResponseField>
+
+<ResponseField name="tags_v2" type="[]Tag">
+  Associated tags
+</ResponseField>
+
+### Update
+
+Update security group name, description, or rules.
+
+```go
+func (r *SecurityGroupService) Update(ctx context.Context, groupID string, params SecurityGroupUpdateParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *SecurityGroupService) UpdateAndPoll(ctx context.Context, groupID string, params SecurityGroupUpdateParams, opts ...option.RequestOption) (*SecurityGroup, error)
+```
+
+<ParamField path="name" type="string">
+  New security group name
+</ParamField>
+
+<ParamField path="description" type="string">
+  New description
+</ParamField>
+
+<ParamField path="rules" type="[]Rule">
+  Complete desired set of rules (existing rules not in this list will be removed)
+</ParamField>
+
+<ParamField path="tags" type="TagUpdateMap">
+  Tags to add, update, or remove
+</ParamField>
+
+<Info>
+  When updating rules, you must specify the complete desired state. Rules not included will be removed.
+</Info>
+
+### List
+
+List all security groups.
+
+```go
+func (r *SecurityGroupService) List(ctx context.Context, params SecurityGroupListParams, opts ...option.RequestOption) (*pagination.OffsetPage[SecurityGroup], error)
+func (r *SecurityGroupService) ListAutoPaging(ctx context.Context, params SecurityGroupListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[SecurityGroup]
+```
+
+<ParamField path="name" type="string">
+  Filter by exact name match
+</ParamField>
+
+<ParamField path="limit" type="int64">
+  Maximum results per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Results to skip
+</ParamField>
+
+### Get
+
+Get security group details.
+
+```go
+func (r *SecurityGroupService) Get(ctx context.Context, groupID string, query SecurityGroupGetParams, opts ...option.RequestOption) (*SecurityGroup, error)
+```
+
+### Delete
+
+Delete a security group and all its rules.
+
+```go
+func (r *SecurityGroupService) Delete(ctx context.Context, groupID string, body SecurityGroupDeleteParams, opts ...option.RequestOption) error
+```
+
+### Copy
+
+Create a deep copy of an existing security group.
+
+```go
+func (r *SecurityGroupService) Copy(ctx context.Context, groupID string, params SecurityGroupCopyParams, opts ...option.RequestOption) (*SecurityGroup, error)
+```
+
+<ParamField path="name" type="string" required>
+  Name for the copied security group
+</ParamField>
+
+### RevertToDefault
+
+Revert a security group to its previous state.
+
+```go
+func (r *SecurityGroupService) RevertToDefault(ctx context.Context, groupID string, body SecurityGroupRevertToDefaultParams, opts ...option.RequestOption) (*SecurityGroup, error)
+```
+
+## Security Group Rules
+
+Each rule defines:
+
+<ResponseField name="direction" type="string">
+  Traffic direction: `ingress` (incoming) or `egress` (outgoing)
+</ResponseField>
+
+<ResponseField name="ethertype" type="string">
+  IP version: `IPv4` or `IPv6`
+</ResponseField>
+
+<ResponseField name="protocol" type="string">
+  Network protocol: `tcp`, `udp`, `icmp`, `any`, or others
+</ResponseField>
+
+<ResponseField name="port_range_min" type="int64">
+  Minimum port number (null for all ports)
+</ResponseField>
+
+<ResponseField name="port_range_max" type="int64">
+  Maximum port number (null for all ports)
+</ResponseField>
+
+<ResponseField name="remote_ip_prefix" type="string">
+  Allowed CIDR block (e.g., "0.0.0.0/0" for all)
+</ResponseField>
+
+<ResponseField name="remote_group_id" type="string">
+  Allow traffic from another security group
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Rule description
+</ResponseField>
+
+## Examples
+
+### Create Security Group with SSH and HTTP Rules
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+rules := []cloud.SecurityGroupNewParamsRule{
+    // Allow SSH from anywhere
+    {
+        Direction:      "ingress",
+        Ethertype:      "IPv4",
+        Protocol:       "tcp",
+        PortRangeMin:   param.NewOpt[int64](22),
+        PortRangeMax:   param.NewOpt[int64](22),
+        RemoteIPPrefix: param.NewOpt("0.0.0.0/0"),
+        Description:    param.NewOpt("Allow SSH"),
+    },
+    // Allow HTTP
+    {
+        Direction:      "ingress",
+        Ethertype:      "IPv4",
+        Protocol:       "tcp",
+        PortRangeMin:   param.NewOpt[int64](80),
+        PortRangeMax:   param.NewOpt[int64](80),
+        RemoteIPPrefix: param.NewOpt("0.0.0.0/0"),
+        Description:    param.NewOpt("Allow HTTP"),
+    },
+    // Allow HTTPS
+    {
+        Direction:      "ingress",
+        Ethertype:      "IPv4",
+        Protocol:       "tcp",
+        PortRangeMin:   param.NewOpt[int64](443),
+        PortRangeMax:   param.NewOpt[int64](443),
+        RemoteIPPrefix: param.NewOpt("0.0.0.0/0"),
+        Description:    param.NewOpt("Allow HTTPS"),
+    },
+}
+
+securityGroup, err := client.Cloud.SecurityGroups.NewAndPoll(context.Background(), 
+    cloud.SecurityGroupNewParams{
+        Name:        "web-server-sg",
+        Description: param.NewOpt("Security group for web servers"),
+        Rules:       rules,
+        Tags:        map[string]string{"tier": "web"},
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created security group: %s\n", securityGroup.ID)
+```
+
+### Create Database Security Group
+
+```go
+rules := []cloud.SecurityGroupNewParamsRule{
+    // Allow PostgreSQL from application security group
+    {
+        Direction:     "ingress",
+        Ethertype:     "IPv4",
+        Protocol:      "tcp",
+        PortRangeMin:  param.NewOpt[int64](5432),
+        PortRangeMax:  param.NewOpt[int64](5432),
+        RemoteGroupID: param.NewOpt(appSecurityGroupID),
+        Description:   param.NewOpt("Allow PostgreSQL from app tier"),
+    },
+}
+
+dbSecurityGroup, err := client.Cloud.SecurityGroups.NewAndPoll(context.Background(), 
+    cloud.SecurityGroupNewParams{
+        Name:        "database-sg",
+        Description: param.NewOpt("Database tier security group"),
+        Rules:       rules,
+    },
+)
+```
+
+### List All Security Groups
+
+```go
+securityGroups, err := client.Cloud.SecurityGroups.List(context.Background(), 
+    cloud.SecurityGroupListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, sg := range securityGroups.Results {
+    fmt.Printf("Security Group: %s (%d rules)\n", 
+        sg.Name, len(sg.SecurityGroupRules))
+}
+```
+
+### Get Security Group Details
+
+```go
+securityGroup, err := client.Cloud.SecurityGroups.Get(context.Background(), 
+    groupID,
+    cloud.SecurityGroupGetParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Security Group: %s\n", securityGroup.Name)
+for _, rule := range securityGroup.SecurityGroupRules {
+    fmt.Printf"  Rule: %s %s port %d-%d\n", 
+        rule.Direction, rule.Protocol, 
+        rule.PortRangeMin, rule.PortRangeMax)
+}
+```
+
+### Update Security Group Rules
+
+```go
+// Get current rules
+securityGroup, err := client.Cloud.SecurityGroups.Get(context.Background(), 
+    groupID, cloud.SecurityGroupGetParams{},
+)
+
+// Add new rule to existing rules
+newRules := []cloud.SecurityGroupUpdateParamsRule{}
+for _, rule := range securityGroup.SecurityGroupRules {
+    newRules = append(newRules, cloud.SecurityGroupUpdateParamsRule{
+        Direction:      rule.Direction,
+        Ethertype:      rule.Ethertype,
+        Protocol:       rule.Protocol,
+        PortRangeMin:   param.NewOpt(rule.PortRangeMin),
+        PortRangeMax:   param.NewOpt(rule.PortRangeMax),
+        RemoteIPPrefix: param.NewOpt(rule.RemoteIPPrefix),
+    })
+}
+
+// Add HTTPS rule
+newRules = append(newRules, cloud.SecurityGroupUpdateParamsRule{
+    Direction:      "ingress",
+    Ethertype:      "IPv4",
+    Protocol:       "tcp",
+    PortRangeMin:   param.NewOpt[int64](443),
+    PortRangeMax:   param.NewOpt[int64](443),
+    RemoteIPPrefix: param.NewOpt("0.0.0.0/0"),
+})
+
+securityGroup, err = client.Cloud.SecurityGroups.UpdateAndPoll(context.Background(), 
+    groupID,
+    cloud.SecurityGroupUpdateParams{
+        Rules: newRules,
+    },
+)
+```
+
+### Copy Security Group
+
+```go
+copiedSG, err := client.Cloud.SecurityGroups.Copy(context.Background(), 
+    groupID,
+    cloud.SecurityGroupCopyParams{
+        Name: "web-server-sg-staging",
+    },
+)
+```
+
+### Delete Security Group
+
+```go
+err := client.Cloud.SecurityGroups.Delete(context.Background(), 
+    groupID,
+    cloud.SecurityGroupDeleteParams{},
+)
+```
+
+## Common Use Cases
+
+### Allow Traffic from Specific IP Range
+
+```go
+rules := []cloud.SecurityGroupNewParamsRule{
+    {
+        Direction:      "ingress",
+        Ethertype:      "IPv4",
+        Protocol:       "tcp",
+        PortRangeMin:   param.NewOpt[int64](22),
+        PortRangeMax:   param.NewOpt[int64](22),
+        RemoteIPPrefix: param.NewOpt("10.0.0.0/8"), // Internal network only
+        Description:    param.NewOpt("SSH from internal network"),
+    },
+}
+```
+
+### Allow All Outbound Traffic
+
+```go
+rules := []cloud.SecurityGroupNewParamsRule{
+    {
+        Direction:      "egress",
+        Ethertype:      "IPv4",
+        Protocol:       "any",
+        RemoteIPPrefix: param.NewOpt("0.0.0.0/0"),
+        Description:    param.NewOpt("Allow all outbound"),
+    },
+}
+```
+
+### Allow ICMP (Ping)
+
+```go
+rules := []cloud.SecurityGroupNewParamsRule{
+    {
+        Direction:      "ingress",
+        Ethertype:      "IPv4",
+        Protocol:       "icmp",
+        RemoteIPPrefix: param.NewOpt("0.0.0.0/0"),
+        Description:    param.NewOpt("Allow ping"),
+    },
+}
+```

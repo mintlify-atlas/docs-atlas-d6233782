@@ -1,0 +1,134 @@
+---
+title: "IAM Service Overview"
+description: "Identity and Access Management (IAM) service for managing users, API tokens, and account details"
+---
+
+## Introduction
+
+The IAM (Identity and Access Management) service provides comprehensive account management operations including user management, API token management, authentication, and account details retrieval.
+
+## Service Structure
+
+The IAM service is organized into the following sub-services:
+
+- **Users**: Manage user accounts, invitations, and permissions
+- **API Tokens**: Create and manage permanent API tokens for automated requests
+
+## Initializing the IAM Service
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/iam"
+)
+
+client := gcore.NewClient(
+    option.WithAPIKey("your-api-key"),
+)
+
+// Access IAM service
+iamService := client.IAM
+```
+
+## Account Management
+
+### Get Account Overview
+
+Retrieve detailed information about your account, including users, services, and features.
+
+```go
+accountOverview, err := iamService.GetAccountOverview(context.Background())
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Account ID: %d\n", accountOverview.ID)
+fmt.Printf("Company: %s\n", accountOverview.CompanyName)
+fmt.Printf("Status: %s\n", accountOverview.Status)
+```
+
+<ResponseField name="id" type="int64" required>
+  The account ID
+</ResponseField>
+
+<ResponseField name="companyName" type="string" required>
+  The company name
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  The account email address
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status of the account. Possible values: `new`, `trial`, `trialend`, `active`, `integration`, `paused`, `preparation`, `ready`
+</ResponseField>
+
+<ResponseField name="currentUser" type="int64" required>
+  ID of the current user
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean" required>
+  Indicates if the account has been deleted
+</ResponseField>
+
+<ResponseField name="capabilities" type="array" required>
+  List of services available for the account. Values: `CDN`, `STORAGE`, `STREAMING`, `DNS`, `DDOS`, `CLOUD`
+</ResponseField>
+
+<ResponseField name="users" type="array">
+  List of account users with their details
+</ResponseField>
+
+<ResponseField name="freeFeatures" type="object" required>
+  Information about free features available for the account, organized by service (CDN, Storage, Streaming, DNS, DDOS, Cloud)
+</ResponseField>
+
+<ResponseField name="paidFeatures" type="object" required>
+  Information about paid features available for the account, organized by service
+</ResponseField>
+
+<ResponseField name="serviceStatuses" type="object" required>
+  Status information for all available services
+</ResponseField>
+
+## User Groups and Roles
+
+IAM supports 5 user groups with different permission levels:
+
+<ParamField path="groups" type="array">
+  - **Administrators** (ID: 1) - Full account access
+  - **Users** (ID: 2) - Standard user access
+  - **Engineers** (ID: 5) - Engineering-specific permissions
+  - **Purge and Prefetch only (API)** (ID: 3022) - API-only purge/prefetch access
+  - **Purge and Prefetch only (API+Web)** (ID: 3009) - Web and API purge/prefetch access
+</ParamField>
+
+## Authentication Types
+
+The IAM service supports multiple authentication methods:
+
+- `password` - Traditional password-based authentication
+- `sso` - SAML SSO authentication
+- `github` - GitHub OAuth
+- `google-oauth2` - Google OAuth 2.0
+
+## Language Support
+
+User language preferences affect the control panel and email messages. Supported languages:
+
+- `de` - German
+- `en` - English
+- `ru` - Russian
+- `zh` - Chinese
+- `az` - Azerbaijani
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="User Management" icon="users" href="/api-reference/iam/users">
+    Learn how to manage users, send invitations, and update user details
+  </Card>
+  <Card title="API Tokens" icon="key" href="/api-reference/iam/api-tokens">
+    Create and manage permanent API tokens for automated access
+  </Card>
+</CardGroup>

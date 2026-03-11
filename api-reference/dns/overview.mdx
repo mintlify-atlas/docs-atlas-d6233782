@@ -1,0 +1,162 @@
+---
+title: 'DNS Service Overview'
+description: 'Manage DNS zones, records, and advanced features with Gcore Go SDK'
+---
+
+The DNS service provides comprehensive management of DNS zones and resource record sets with support for DNSSEC, SOA configuration, geo-balancing, and failover capabilities.
+
+## Service Structure
+
+The DNS service is organized into several sub-services:
+
+- **Zones** - DNS zone management with DNSSEC and SOA configuration
+- **Rrsets** - Resource record sets (A, AAAA, CNAME, MX, TXT, SRV, NS)
+- **Locations** - Location-based routing information
+- **Metrics** - DNS query metrics and analytics
+- **Pickers** - Advanced traffic routing and balancing rules
+- **NetworkMappings** - CIDR range associations for private DNS resolution
+
+## Initialization
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithAPIKey("your-api-key"),
+)
+
+// Access DNS service
+dnsService := client.DNS
+```
+
+## Get Account Overview
+
+Retrieve DNS account information including name servers.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+info, err := client.DNS.GetAccountOverview(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Name Server 1: %s\n", info.Info.NameServer1)
+fmt.Printf("Name Server 2: %s\n", info.Info.NameServer2)
+fmt.Printf("Contact: %s\n", info.Info.Contact)
+```
+
+```json Response
+{
+  "Info": {
+    "name_server_1": "ns1.gcorelabs.net",
+    "name_server_2": "ns2.gcdn.services",
+    "contact": "support@gcore.com"
+  }
+}
+```
+</CodeGroup>
+
+### Response Fields
+
+<ResponseField name="Info" type="object" required>
+  Account information
+  
+  <Expandable title="properties">
+    <ResponseField name="name_server_1" type="string" required>
+      Primary name server
+    </ResponseField>
+    
+    <ResponseField name="name_server_2" type="string" required>
+      Secondary name server
+    </ResponseField>
+    
+    <ResponseField name="contact" type="string" required>
+      Contact email address
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## DNS Lookup
+
+Perform DNS lookups using various resolvers.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+results, err := client.DNS.Lookup(ctx, dns.DNSLookupParams{
+    Name: gcore.F("example.com"),
+    RequestServer: gcore.F(dns.DNSLookupParamsRequestServerGcore),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, record := range *results {
+    fmt.Printf("Type: %s, Name: %s, TTL: %d\n", record.Type, record.Name, record.Ttl)
+    fmt.Printf("Content: %v\n", record.Content)
+}
+```
+
+```json Response
+[
+  {
+    "name": "example.com",
+    "type": "A",
+    "ttl": 300,
+    "content": ["93.184.216.34"]
+  }
+]
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="name" type="string">
+  Domain name to lookup
+</ParamField>
+
+<ParamField path="request_server" type="string">
+  Resolver to use for the query. Options:
+  - `authoritative_dns` - Use authoritative DNS servers
+  - `google` - Use Google DNS (8.8.8.8)
+  - `cloudflare` - Use Cloudflare DNS (1.1.1.1)
+  - `open_dns` - Use OpenDNS
+  - `quad9` - Use Quad9 DNS
+  - `gcore` - Use Gcore DNS servers
+</ParamField>
+
+### Response Fields
+
+<ResponseField name="name" type="string" required>
+  The queried domain name
+</ResponseField>
+
+<ResponseField name="type" type="string" required>
+  DNS record type (A, AAAA, CNAME, etc.)
+</ResponseField>
+
+<ResponseField name="ttl" type="integer" required>
+  Time to live in seconds
+</ResponseField>
+
+<ResponseField name="content" type="array" required>
+  Array of record values
+</ResponseField>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="DNS Zones" icon="layer-group" href="/api-reference/dns/zones">
+    Create and manage DNS zones
+  </Card>
+  
+  <Card title="DNS Records" icon="list" href="/api-reference/dns/records">
+    Manage DNS resource record sets
+  </Card>
+</CardGroup>

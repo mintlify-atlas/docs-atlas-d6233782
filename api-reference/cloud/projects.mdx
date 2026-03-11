@@ -1,0 +1,263 @@
+---
+title: 'Project Management'
+description: 'Create and manage Gcore cloud projects for organizing resources'
+---
+
+Projects are organizational units that group cloud resources for access control and billing. Each client can have multiple projects, with one designated as the default project.
+
+## Methods
+
+### New
+
+Create a new project.
+
+```go
+func (r *ProjectService) New(ctx context.Context, body ProjectNewParams, opts ...option.RequestOption) (*Project, error)
+```
+
+<ParamField path="name" type="string" required>
+  Unique project name
+</ParamField>
+
+<ParamField path="description" type="string">
+  Project description
+</ParamField>
+
+<ResponseField name="id" type="int64">
+  Automatically generated project ID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Project name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  Project description
+</ResponseField>
+
+<ResponseField name="client_id" type="int64">
+  Associated client ID
+</ResponseField>
+
+<ResponseField name="is_default" type="bool">
+  Whether this is the default project
+</ResponseField>
+
+<ResponseField name="state" type="string">
+  Project state
+</ResponseField>
+
+<ResponseField name="created_at" type="time.Time">
+  Creation timestamp
+</ResponseField>
+
+<ResponseField name="deleted_at" type="time.Time">
+  Deletion timestamp (if deleted)
+</ResponseField>
+
+### Update
+
+Update project name or description.
+
+```go
+func (r *ProjectService) Update(ctx context.Context, params ProjectUpdateParams, opts ...option.RequestOption) (*Project, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID to update
+</ParamField>
+
+<ParamField path="name" type="string">
+  New project name
+</ParamField>
+
+<ParamField path="description" type="string">
+  New project description
+</ParamField>
+
+### List
+
+List all projects with optional filtering.
+
+```go
+func (r *ProjectService) List(ctx context.Context, query ProjectListParams, opts ...option.RequestOption) (*pagination.OffsetPage[Project], error)
+func (r *ProjectService) ListAutoPaging(ctx context.Context, query ProjectListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[Project]
+```
+
+<ParamField path="client_id" type="int64">
+  Filter by client ID (admin only)
+</ParamField>
+
+<ParamField path="name" type="string">
+  Filter by project name
+</ParamField>
+
+<ParamField path="include_deleted" type="bool">
+  Include deleted projects in results
+</ParamField>
+
+<ParamField path="order_by" type="string">
+  Sort order: `created_at.asc`, `created_at.desc`, `name.asc`, `name.desc`
+</ParamField>
+
+<ParamField path="limit" type="int64">
+  Maximum number of results per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Number of results to skip
+</ParamField>
+
+### Get
+
+Retrieve a specific project by ID.
+
+```go
+func (r *ProjectService) Get(ctx context.Context, query ProjectGetParams, opts ...option.RequestOption) (*Project, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+### Delete
+
+Delete a project and all associated resources.
+
+```go
+func (r *ProjectService) Delete(ctx context.Context, body ProjectDeleteParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *ProjectService) DeleteAndPoll(ctx context.Context, body ProjectDeleteParams, opts ...option.RequestOption) error
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID to delete
+</ParamField>
+
+<Warning>
+  This operation is irreversible and will delete all cloud resources in all regions. Default projects cannot be deleted.
+</Warning>
+
+## Examples
+
+### Create a Project
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+client := gcore.NewClient()
+
+project, err := client.Cloud.Projects.New(context.Background(), cloud.ProjectNewParams{
+    Name:        "my-production-project",
+    Description: gcore.String("Production environment resources"),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created project ID: %d\n", project.ID)
+```
+
+### List All Projects
+
+```go
+projects, err := client.Cloud.Projects.List(context.Background(), cloud.ProjectListParams{})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, project := range projects.Results {
+    fmt.Printf("Project: %s (ID: %d)\n", project.Name, project.ID)
+}
+```
+
+### List Projects with Auto-Paging
+
+```go
+iter := client.Cloud.Projects.ListAutoPaging(context.Background(), 
+    cloud.ProjectListParams{
+        Limit: gcore.Int(10),
+    },
+)
+
+for iter.Next() {
+    project := iter.Current()
+    fmt.Printf("Project: %s\n", project.Name)
+}
+
+if err := iter.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Update a Project
+
+```go
+project, err := client.Cloud.Projects.Update(context.Background(), 
+    cloud.ProjectUpdateParams{
+        ProjectID:   gcore.Int(projectID),
+        Name:        gcore.String("updated-name"),
+        Description: gcore.String("Updated description"),
+    },
+)
+```
+
+### Get Project Details
+
+```go
+project, err := client.Cloud.Projects.Get(context.Background(), 
+    cloud.ProjectGetParams{
+        ProjectID: gcore.Int(projectID),
+    },
+)
+```
+
+### Delete a Project
+
+```go
+// Delete and wait for completion
+err := client.Cloud.Projects.DeleteAndPoll(context.Background(), 
+    cloud.ProjectDeleteParams{
+        ProjectID: gcore.Int(projectID),
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Common Use Cases
+
+### Organizing Resources by Environment
+
+Create separate projects for different environments:
+
+```go
+envs := []string{"development", "staging", "production"}
+
+for _, env := range envs {
+    project, err := client.Cloud.Projects.New(context.Background(), 
+        cloud.ProjectNewParams{
+            Name:        fmt.Sprintf("myapp-%s", env),
+            Description: gcore.String(fmt.Sprintf("%s environment", env)),
+        },
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Created %s project: %d\n", env, project.ID)
+}
+```
+
+### Finding Projects by Name
+
+```go
+projects, err := client.Cloud.Projects.List(context.Background(), 
+    cloud.ProjectListParams{
+        Name: gcore.String("production"),
+    },
+)
+```

@@ -1,0 +1,83 @@
+---
+title: "Response Objects"
+description: "Learn how to work with response objects and handle optional data in the Gcore Go SDK"
+---
+
+## Overview
+
+All fields in response structs are ordinary value types (not pointers or wrappers). Response structs also include a special `JSON` field containing metadata about each property.
+
+## Response Structure
+
+```go
+type Animal struct {
+	Name   string `json:"name,nullable"`
+	Owners int    `json:"owners"`
+	Age    int    `json:"age"`
+	JSON   struct {
+		Name        respjson.Field
+		Owner       respjson.Field
+		Age         respjson.Field
+		ExtraFields map[string]respjson.Field
+	} `json:"-"`
+}
+```
+
+## Handling Optional Data
+
+To handle optional data, use the `.Valid()` method on the JSON field.
+
+<Info>
+`.Valid()` returns true if a field is not `null`, not present, or couldn't be marshaled.
+</Info>
+
+If `.Valid()` is false, the corresponding field will simply be its zero value.
+
+## Complete Example
+
+```go
+raw := `{"owners": 1, "name": null}`
+
+var res Animal
+json.Unmarshal([]byte(raw), &res)
+
+// Accessing regular fields
+
+res.Owners // 1
+res.Name   // ""
+res.Age    // 0
+
+// Optional field checks
+
+res.JSON.Owners.Valid() // true
+res.JSON.Name.Valid()   // false
+res.JSON.Age.Valid()    // false
+
+// Raw JSON values
+
+res.JSON.Owners.Raw()                  // "1"
+res.JSON.Name.Raw() == "null"          // true
+res.JSON.Name.Raw() == respjson.Null   // true
+res.JSON.Age.Raw() == ""               // true
+res.JSON.Age.Raw() == respjson.Omitted // true
+```
+
+## Extra Fields
+
+These `.JSON` structs also include an `ExtraFields` map containing any properties in the json response that were not specified in the struct.
+
+<Note>
+This can be useful for API features not yet present in the SDK.
+</Note>
+
+```go
+body := res.JSON.ExtraFields["my_unexpected_field"].Raw()
+```
+
+## Accessing Raw JSON
+
+To access undocumented response properties, you may either:
+- Access the raw JSON of the response as a string with `result.JSON.RawJSON()`
+- Get the raw JSON of a particular field on the result with `result.JSON.Foo.Raw()`
+
+Any fields that are not present on the response struct will be saved and can be accessed by `result.JSON.ExtraFields()` which returns the extra fields as a `map[string]Field`.

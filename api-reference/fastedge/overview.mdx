@@ -1,0 +1,120 @@
+---
+title: 'Fastedge Service'
+description: 'Edge computing platform for deploying WebAssembly applications at the CDN edge'
+---
+
+## Overview
+
+The Fastedge service provides a complete edge computing platform that allows you to deploy WebAssembly applications at the CDN edge. It manages edge applications, binaries, secrets, key-value stores, templates, and statistics.
+
+## Service Structure
+
+The `FastedgeService` includes the following sub-services:
+
+- **Apps** - FastEdge applications that combine WebAssembly binaries with configuration, environment variables, and secrets
+- **Binaries** - Immutable WebAssembly modules that implement edge application logic
+- **Secrets** - Secure storage for sensitive values like API keys and tokens
+- **KvStores** - Key-value edge storage for applications
+- **Templates** - Application templates for quick deployment
+- **Statistics** - Usage statistics and metrics for edge applications
+
+## Get Account Overview
+
+Retrieve the current status, limits, and consumption metrics for your Fastedge account.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("your-api-key"),
+    )
+    
+    overview, err := client.Fastedge.GetAccountOverview(context.Background())
+    if err != nil {
+        panic(err)
+    }
+    
+    fmt.Printf("App Count: %d\n", overview.AppCount)
+    fmt.Printf("Status: %d\n", overview.Status)
+    fmt.Printf("Plan: %s\n", overview.Plan)
+    fmt.Printf("Daily Consumption: %d\n", overview.DailyConsumption)
+    fmt.Printf("Hourly Consumption: %d\n", overview.HourlyConsumption)
+    fmt.Printf("Monthly Consumption: %d\n", overview.MonthlyConsumption)
+}
+```
+
+### Response
+
+<ResponseField name="app_count" type="int64" required>
+  Actual allowed number of apps
+</ResponseField>
+
+<ResponseField name="status" type="int64" required>
+  Status code:
+  - `1` - enabled
+  - `2` - disabled
+  - `3` - hourly call limit exceeded
+  - `4` - daily call limit exceeded
+  - `5` - suspended
+</ResponseField>
+
+<ResponseField name="plan_id" type="int64" required>
+  Plan ID
+</ResponseField>
+
+<ResponseField name="plan" type="string">
+  Plan name
+</ResponseField>
+
+<ResponseField name="daily_consumption" type="int64" required>
+  Actual number of calls for all apps during the current day (UTC)
+</ResponseField>
+
+<ResponseField name="hourly_consumption" type="int64" required>
+  Actual number of calls for all apps during the current hour
+</ResponseField>
+
+<ResponseField name="monthly_consumption" type="int64" required>
+  Actual number of calls for all apps during the current calendar month (UTC)
+</ResponseField>
+
+<ResponseField name="networks" type="array" required>
+  List of enabled networks
+
+  <Expandable title="Network Object">
+    <ResponseField name="name" type="string" required>
+      Network name
+    </ResponseField>
+    
+    <ResponseField name="is_default" type="bool" required>
+      Whether the network is default
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Status Codes
+
+The Fastedge service uses the following status codes for accounts and applications:
+
+| Code | Description |
+|------|-------------|
+| 0 | Draft (inactive) - for apps only |
+| 1 | Enabled |
+| 2 | Disabled |
+| 3 | Hourly call limit exceeded |
+| 4 | Daily call limit exceeded |
+| 5 | Suspended |
+
+## Related Resources
+
+- [Apps Documentation](/api-reference/fastedge/apps)
+- [Binaries Documentation](/api-reference/fastedge/binaries)
+- [Secrets Documentation](/api-reference/fastedge/secrets)

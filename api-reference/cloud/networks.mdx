@@ -1,0 +1,351 @@
+---
+title: 'Virtual Networks'
+description: 'Create and manage software-defined networks and subnets for cloud resources'
+---
+
+Networks provide software-defined networking infrastructure for connecting instances and other cloud resources within a region.
+
+## Methods
+
+### New
+
+Create a new virtual network.
+
+```go
+func (r *NetworkService) New(ctx context.Context, params NetworkNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *NetworkService) NewAndPoll(ctx context.Context, params NetworkNewParams, opts ...option.RequestOption) (*Network, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Network name
+</ParamField>
+
+<ParamField path="create_router" type="bool">
+  Automatically create a router for the network. Defaults to `true`
+</ParamField>
+
+<ParamField path="type" type="string">
+  Network type: `vlan` or `vxlan`. Default is `vxlan`
+</ParamField>
+
+<ParamField path="tags" type="map[string]string">
+  Key-value tags
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Network UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Network name
+</ResponseField>
+
+<ResponseField name="type" type="string">
+  Network type (vlan or vxlan)
+</ResponseField>
+
+<ResponseField name="external" type="bool">
+  Whether this is an external network
+</ResponseField>
+
+<ResponseField name="shared" type="bool">
+  Whether this network is shared across projects
+</ResponseField>
+
+<ResponseField name="subnets" type="[]string">
+  List of subnet IDs in this network
+</ResponseField>
+
+### Update
+
+Update network name or tags.
+
+```go
+func (r *NetworkService) Update(ctx context.Context, networkID string, params NetworkUpdateParams, opts ...option.RequestOption) (*Network, error)
+```
+
+<ParamField path="name" type="string">
+  New network name
+</ParamField>
+
+<ParamField path="tags" type="TagUpdateMap">
+  Tags to add, update, or remove
+</ParamField>
+
+### List
+
+List networks with optional filtering.
+
+```go
+func (r *NetworkService) List(ctx context.Context, params NetworkListParams, opts ...option.RequestOption) (*pagination.OffsetPage[Network], error)
+func (r *NetworkService) ListAutoPaging(ctx context.Context, params NetworkListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[Network]
+```
+
+<ParamField path="name" type="string">
+  Filter by network name
+</ParamField>
+
+<ParamField path="external" type="bool">
+  Filter by external network status
+</ParamField>
+
+<ParamField path="network_type" type="string">
+  Filter by network type: `vlan` or `vxlan`
+</ParamField>
+
+<ParamField path="owned_by" type="string">
+  Control which networks to return: `project` (default) or `any` (includes shared networks)
+</ParamField>
+
+<ParamField path="order_by" type="string">
+  Sort order: `created_at.asc`, `created_at.desc`, `name.asc`, `name.desc`, `priority.desc`
+</ParamField>
+
+<ParamField path="limit" type="int64">
+  Maximum results per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Results to skip
+</ParamField>
+
+### Get
+
+Retrieve network details.
+
+```go
+func (r *NetworkService) Get(ctx context.Context, networkID string, query NetworkGetParams, opts ...option.RequestOption) (*Network, error)
+```
+
+### Delete
+
+Delete a network.
+
+```go
+func (r *NetworkService) Delete(ctx context.Context, networkID string, body NetworkDeleteParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *NetworkService) DeleteAndPoll(ctx context.Context, networkID string, body NetworkDeleteParams, opts ...option.RequestOption) error
+```
+
+## Sub-Services
+
+### Subnets
+
+Manage subnets within networks.
+
+```go
+client.Cloud.Networks.Subnets.New(ctx, params) // Create subnet
+client.Cloud.Networks.Subnets.List(ctx, params) // List subnets
+client.Cloud.Networks.Subnets.Get(ctx, subnetID, params)
+client.Cloud.Networks.Subnets.Update(ctx, subnetID, params)
+client.Cloud.Networks.Subnets.Delete(ctx, subnetID, params)
+```
+
+### Routers
+
+Manage routers for network connectivity.
+
+```go
+client.Cloud.Networks.Routers.New(ctx, params) // Create router
+client.Cloud.Networks.Routers.List(ctx, params) // List routers
+client.Cloud.Networks.Routers.Get(ctx, routerID, params)
+client.Cloud.Networks.Routers.Update(ctx, routerID, params)
+client.Cloud.Networks.Routers.Delete(ctx, routerID, params)
+```
+
+## Examples
+
+### Create a Network
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+network, err := client.Cloud.Networks.NewAndPoll(context.Background(), 
+    cloud.NetworkNewParams{
+        Name:         "my-network",
+        CreateRouter: gcore.Bool(true),
+        Type:         cloud.NetworkNewParamsTypeVxlan,
+        Tags:         map[string]string{"environment": "production"},
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created network: %s\n", network.ID)
+```
+
+### Create a Subnet
+
+```go
+subnet, err := client.Cloud.Networks.Subnets.NewAndPoll(context.Background(), 
+    cloud.NetworkSubnetNewParams{
+        NetworkID: networkID,
+        Name:      "my-subnet",
+        Cidr:      "10.0.1.0/24",
+        EnableDhcp: gcore.Bool(true),
+    },
+)
+```
+
+### List All Networks
+
+```go
+networks, err := client.Cloud.Networks.List(context.Background(), 
+    cloud.NetworkListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, net := range networks.Results {
+    fmt.Printf("Network: %s (Type: %s)\n", net.Name, net.Type)
+}
+```
+
+### List Networks with Shared Networks
+
+```go
+networks, err := client.Cloud.Networks.List(context.Background(), 
+    cloud.NetworkListParams{
+        OwnedBy: cloud.NetworkListParamsOwnedByAny,
+    },
+)
+```
+
+### Update Network
+
+```go
+network, err := client.Cloud.Networks.Update(context.Background(), 
+    networkID,
+    cloud.NetworkUpdateParams{
+        Name: param.NewOpt("updated-network-name"),
+        Tags: cloud.TagUpdateMap{
+            "environment": param.NewOpt("staging"),
+        },
+    },
+)
+```
+
+### Get Network Details
+
+```go
+network, err := client.Cloud.Networks.Get(context.Background(), 
+    networkID,
+    cloud.NetworkGetParams{},
+)
+```
+
+### Delete Network
+
+```go
+err := client.Cloud.Networks.DeleteAndPoll(context.Background(), 
+    networkID,
+    cloud.NetworkDeleteParams{},
+)
+```
+
+## Common Use Cases
+
+### Create Network with Subnet
+
+```go
+// Create network
+network, err := client.Cloud.Networks.NewAndPoll(context.Background(), 
+    cloud.NetworkNewParams{
+        Name:         "app-network",
+        CreateRouter: gcore.Bool(true),
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Create subnet
+subnet, err := client.Cloud.Networks.Subnets.NewAndPoll(context.Background(), 
+    cloud.NetworkSubnetNewParams{
+        NetworkID:  network.ID,
+        Name:       "app-subnet",
+        Cidr:       "192.168.1.0/24",
+        EnableDhcp: gcore.Bool(true),
+        DnsNameservers: []string{"8.8.8.8", "8.8.4.4"},
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Network: %s, Subnet: %s\n", network.ID, subnet.ID)
+```
+
+### Multi-tier Network Architecture
+
+```go
+// Create network
+network, err := client.Cloud.Networks.NewAndPoll(context.Background(), 
+    cloud.NetworkNewParams{
+        Name: "multi-tier-network",
+    },
+)
+
+// Web tier subnet
+webSubnet, _ := client.Cloud.Networks.Subnets.NewAndPoll(context.Background(), 
+    cloud.NetworkSubnetNewParams{
+        NetworkID: network.ID,
+        Name:      "web-tier",
+        Cidr:      "10.0.1.0/24",
+    },
+)
+
+// App tier subnet
+appSubnet, _ := client.Cloud.Networks.Subnets.NewAndPoll(context.Background(), 
+    cloud.NetworkSubnetNewParams{
+        NetworkID: network.ID,
+        Name:      "app-tier",
+        Cidr:      "10.0.2.0/24",
+    },
+)
+
+// Database tier subnet
+dbSubnet, _ := client.Cloud.Networks.Subnets.NewAndPoll(context.Background(), 
+    cloud.NetworkSubnetNewParams{
+        NetworkID: network.ID,
+        Name:      "db-tier",
+        Cidr:      "10.0.3.0/24",
+    },
+)
+```
+
+### List Subnets in a Network
+
+```go
+subnets, err := client.Cloud.Networks.Subnets.List(context.Background(), 
+    cloud.NetworkSubnetListParams{
+        NetworkID: gcore.String(networkID),
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, subnet := range subnets.Results {
+    fmt.Printf("Subnet: %s, CIDR: %s\n", subnet.Name, subnet.Cidr)
+}
+```

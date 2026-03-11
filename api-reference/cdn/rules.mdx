@@ -1,0 +1,439 @@
+---
+title: "CDN Resource Rules"
+description: "Configure custom caching, delivery, and security rules for specific URL patterns"
+---
+
+CDN resource rules allow you to apply custom configurations to specific URL patterns or file types. Rules override the main CDN resource settings for matching requests.
+
+## Create Rule
+
+Create a new rule for a CDN resource.
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+)
+
+params := cdn.CDNResourceRuleNewParams{
+    Name:     "Cache images for 7 days",
+    Rule:     "/images/*.(jpg|png|webp)",
+    RuleType: 0, // Regular expression
+    Active:   gcore.Bool(true),
+    Weight:   gcore.Int(1),
+    Options: cdn.CDNResourceRuleNewParamsOptions{
+        EdgeCacheSettings: cdn.CDNResourceRuleNewParamsOptionsEdgeCacheSettings{
+            Enabled: true,
+            Value:   gcore.String("604800s"), // 7 days
+        },
+    },
+}
+
+rule, err := client.CDN.CDNResources.Rules.New(
+    context.Background(),
+    resourceID,
+    params,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created rule ID: %d\n", rule.ID)
+```
+
+<ParamField path="name" type="string" required>
+  Rule name for identification
+</ParamField>
+
+<ParamField path="rule" type="string" required>
+  URL path pattern for matching requests. A leading forward slash is automatically added
+</ParamField>
+
+<ParamField path="rule_type" type="int64" required>
+  Rule pattern type:
+  - `0` - Regular expression (must start with `^/` or `/`)
+  - `1` - Legacy regular expression (automatically prefixed with `/`)
+</ParamField>
+
+<ParamField path="active" type="boolean">
+  Whether the rule is active. `true` applies rule settings, `false` disables the rule
+</ParamField>
+
+<ParamField path="weight" type="int64">
+  Rule execution order from lowest (1) to highest. Higher weight rules take precedence when multiple rules match
+</ParamField>
+
+<ParamField path="origin_group" type="int64">
+  Origin group ID to use for this rule. If not specified, inherits from CDN resource
+</ParamField>
+
+<ParamField path="override_origin_protocol" type="string">
+  Override origin protocol: `HTTP`, `HTTPS`, or `MATCH`. `null` inherits from CDN resource
+</ParamField>
+
+<ParamField path="options" type="object">
+  Rule-specific configuration options. See [Rule Options](#rule-options) section
+</ParamField>
+
+## Get Rule
+
+Retrieve details of a specific rule.
+
+```go
+rule, err := client.CDN.CDNResources.Rules.Get(
+    context.Background(),
+    ruleID,
+    cdn.CDNResourceRuleGetParams{
+        ResourceID: resourceID,
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Rule: %s (ID: %d)\n", rule.Name, rule.ID)
+fmt.Printf("Pattern: %s, Active: %v\n", rule.Rule, rule.Active)
+```
+
+<ResponseField name="id" type="int64">
+  Rule ID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Rule name
+</ResponseField>
+
+<ResponseField name="rule" type="string">
+  URL path pattern
+</ResponseField>
+
+<ResponseField name="rule_type" type="int64">
+  Rule pattern type (0 or 1)
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the rule is active and applied
+</ResponseField>
+
+<ResponseField name="weight" type="int64">
+  Rule execution order priority
+</ResponseField>
+
+<ResponseField name="options" type="object">
+  Rule configuration options
+</ResponseField>
+
+## List Rules
+
+Get all rules for a CDN resource.
+
+```go
+rules, err := client.CDN.CDNResources.Rules.List(
+    context.Background(),
+    resourceID,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, rule := range rules.Results {
+    fmt.Printf("Rule: %s (Weight: %d)\n", rule.Name, rule.Weight)
+}
+```
+
+## Update Rule
+
+Modify an existing rule.
+
+```go
+params := cdn.CDNResourceRuleUpdateParams{
+    ResourceID: resourceID,
+    Active:     param.NewOpt(true),
+    Weight:     param.NewOpt[int64](5),
+    Options: cdn.CDNResourceRuleUpdateParamsOptions{
+        EdgeCacheSettings: cdn.CDNResourceRuleUpdateParamsOptionsEdgeCacheSettings{
+            Enabled: true,
+            Value:   gcore.String("86400s"),
+        },
+    },
+}
+
+rule, err := client.CDN.CDNResources.Rules.Update(
+    context.Background(),
+    ruleID,
+    params,
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Delete Rule
+
+Delete a rule permanently. The rule must be deactivated first.
+
+```go
+err := client.CDN.CDNResources.Rules.Delete(
+    context.Background(),
+    ruleID,
+    cdn.CDNResourceRuleDeleteParams{
+        ResourceID: resourceID,
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<Note>
+  Set the `active` attribute to `false` before deletion. This action is irreversible.
+</Note>
+
+## Rule Options
+
+Rules support the same configuration options as CDN resources. Options specified in rules override the main resource settings for matching requests.
+
+### Cache Configuration
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    EdgeCacheSettings: cdn.CDNResourceRuleNewParamsOptionsEdgeCacheSettings{
+        Enabled: true,
+        CustomValues: map[string]string{
+            "200": "86400s",  // Cache 200 responses for 24 hours
+            "404": "3600s",   // Cache 404 responses for 1 hour
+        },
+    },
+    BrowserCacheSettings: cdn.CDNResourceRuleNewParamsOptionsBrowserCacheSettings{
+        Enabled: true,
+        Value:   "7200s", // 2 hours
+    },
+}
+```
+
+### Compression Settings
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    GzipOn: cdn.CDNResourceRuleNewParamsOptionsGzipOn{
+        Enabled: true,
+        Value:   true,
+    },
+    BrotliCompression: cdn.CDNResourceRuleNewParamsOptionsBrotliCompression{
+        Enabled: true,
+        Value:   []string{"text/html", "text/css", "application/javascript"},
+    },
+}
+```
+
+<Note>
+  If `fetch_compressed` is enabled in the resource settings, you must set it to `false` in the rule to use `gzipOn` or `brotli_compression`.
+</Note>
+
+### Query String Handling
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    QueryParamsWhitelist: cdn.CDNResourceRuleNewParamsOptionsQueryParamsWhitelist{
+        Enabled: true,
+        Value:   []string{"id", "version", "locale"},
+    },
+}
+```
+
+### Access Control
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    IPAddressACL: cdn.CDNResourceRuleNewParamsOptionsIPAddressACL{
+        Enabled:        true,
+        PolicyType:     "allow",
+        ExceptedValues: []string{"10.0.0.0/8"},
+    },
+    ReferrerACL: cdn.CDNResourceRuleNewParamsOptionsReferrerACL{
+        Enabled:        true,
+        PolicyType:     "deny",
+        ExceptedValues: []string{"badsite.com", "*.spam.com"},
+    },
+}
+```
+
+### HTTP Headers
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    StaticResponseHeaders: cdn.CDNResourceRuleNewParamsOptionsStaticResponseHeaders{
+        Enabled: true,
+        Value: map[string]string{
+            "X-Custom-Header": "value",
+            "Cache-Control":   "public, max-age=3600",
+        },
+    },
+    HostHeader: cdn.CDNResourceRuleNewParamsOptionsHostHeader{
+        Enabled: true,
+        Value:   "origin.example.com",
+    },
+}
+```
+
+### CORS Configuration
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    Cors: cdn.CDNResourceRuleNewParamsOptionsCors{
+        Enabled: true,
+        Value:   []string{"https://app.example.com", "https://admin.example.com"},
+        Always:  gcore.Bool(false), // Only add for 2xx/3xx responses
+    },
+}
+```
+
+### Image Optimization
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    ImageStack: cdn.CDNResourceRuleNewParamsOptionsImageStack{
+        Enabled:     true,
+        Quality:     gcore.Int(85),
+        WebpEnabled: gcore.Bool(true),
+        AvifEnabled: gcore.Bool(true),
+        PngLossless: gcore.Bool(false),
+    },
+}
+```
+
+### Force Return (Redirects)
+
+```go
+Options: cdn.CDNResourceRuleNewParamsOptions{
+    ForceReturn: cdn.CDNResourceRuleNewParamsOptionsForceReturn{
+        Enabled: true,
+        Code:    301,
+        Body:    "https://newsite.example.com",
+    },
+}
+```
+
+## Rule Examples
+
+### Long-term Caching for Static Assets
+
+```go
+params := cdn.CDNResourceRuleNewParams{
+    Name:     "Cache static assets for 30 days",
+    Rule:     "\\.(css|js|jpg|jpeg|png|gif|svg|woff|woff2|ttf|eot)$",
+    RuleType: 0,
+    Active:   gcore.Bool(true),
+    Weight:   gcore.Int(10),
+    Options: cdn.CDNResourceRuleNewParamsOptions{
+        EdgeCacheSettings: cdn.CDNResourceRuleNewParamsOptionsEdgeCacheSettings{
+            Enabled: true,
+            Value:   gcore.String("2592000s"), // 30 days
+        },
+        BrowserCacheSettings: cdn.CDNResourceRuleNewParamsOptionsBrowserCacheSettings{
+            Enabled: true,
+            Value:   "2592000s",
+        },
+    },
+}
+```
+
+### API Endpoint with No Caching
+
+```go
+params := cdn.CDNResourceRuleNewParams{
+    Name:     "No cache for API",
+    Rule:     "/api/.*",
+    RuleType: 0,
+    Active:   gcore.Bool(true),
+    Weight:   gcore.Int(5),
+    Options: cdn.CDNResourceRuleNewParamsOptions{
+        EdgeCacheSettings: cdn.CDNResourceRuleNewParamsOptionsEdgeCacheSettings{
+            Enabled: true,
+            Value:   gcore.String("0s"), // Disable caching
+        },
+        AllowedHTTPMethods: cdn.CDNResourceRuleNewParamsOptionsAllowedHTTPMethods{
+            Enabled: true,
+            Value:   []string{"GET", "POST", "PUT", "DELETE", "PATCH"},
+        },
+    },
+}
+```
+
+### Geo-blocking for Specific Content
+
+```go
+params := cdn.CDNResourceRuleNewParams{
+    Name:     "Block EU users from premium content",
+    Rule:     "/premium/.*",
+    RuleType: 0,
+    Active:   gcore.Bool(true),
+    Weight:   gcore.Int(15),
+    Options: cdn.CDNResourceRuleNewParamsOptions{
+        CountryACL: cdn.CDNResourceRuleNewParamsOptionsCountryACL{
+            Enabled:        true,
+            PolicyType:     "deny",
+            ExceptedValues: []string{"US", "CA"},
+        },
+        ForceReturn: cdn.CDNResourceRuleNewParamsOptionsForceReturn{
+            Enabled: true,
+            Code:    403,
+            Body:    "Access denied for your region",
+        },
+    },
+}
+```
+
+### Optimize Images
+
+```go
+params := cdn.CDNResourceRuleNewParams{
+    Name:     "Optimize and convert images",
+    Rule:     "\\.(jpg|jpeg|png)$",
+    RuleType: 0,
+    Active:   gcore.Bool(true),
+    Weight:   gcore.Int(20),
+    Options: cdn.CDNResourceRuleNewParamsOptions{
+        ImageStack: cdn.CDNResourceRuleNewParamsOptionsImageStack{
+            Enabled:     true,
+            Quality:     gcore.Int(80),
+            WebpEnabled: gcore.Bool(true),
+            AvifEnabled: gcore.Bool(true),
+        },
+        EdgeCacheSettings: cdn.CDNResourceRuleNewParamsOptionsEdgeCacheSettings{
+            Enabled: true,
+            Value:   gcore.String("604800s"), // 7 days
+        },
+    },
+}
+```
+
+## Rule Priority
+
+When multiple rules match a request, the rule with the highest `weight` is applied. Plan your rule weights carefully:
+
+1. **Low priority (1-10)**: General rules for common patterns
+2. **Medium priority (11-50)**: Specific content type rules
+3. **High priority (51+)**: Override rules for special cases
+
+```go
+// Low priority - general static assets
+Weight: gcore.Int(5)
+
+// Medium priority - specific image handling
+Weight: gcore.Int(20)
+
+// High priority - override for specific files
+Weight: gcore.Int(100)
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="CDN Resources" icon="server" href="/api-reference/cdn/resources">
+    Manage parent CDN resource configurations
+  </Card>
+  <Card title="SSL Certificates" icon="lock" href="/api-reference/cdn/certificates">
+    Manage HTTPS certificates
+  </Card>
+</CardGroup>

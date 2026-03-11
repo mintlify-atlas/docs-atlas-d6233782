@@ -1,0 +1,463 @@
+---
+title: Error Handling
+description: Learn how to handle errors effectively in the Gcore Go SDK
+---
+
+## The gcore.Error Type
+
+When the Gcore API returns a non-success status code, the SDK returns an error of type `*gcore.Error`. This error type contains detailed information about the failed request:
+
+```go
+type Error struct {
+    StatusCode int
+    Request    *http.Request
+    Response   *http.Response
+    JSON       struct {
+        ExtraFields map[string]respjson.Field
+        raw         string
+    }
+}
+```
+
+### Error Structure
+
+- **StatusCode**: HTTP status code of the response
+- **Request**: The original HTTP request
+- **Response**: The HTTP response from the API
+- **JSON**: Raw JSON response body and any extra fields
+
+## Using errors.As Pattern
+
+The recommended way to handle API errors is using the `errors.As` pattern:
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("My API Key"),
+    )
+    
+    _, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    
+    if err != nil {
+        var apierr *gcore.Error
+        if errors.As(err, &apierr) {
+            // This is an API error
+            fmt.Printf("API Error: Status %d\n", apierr.StatusCode)
+            fmt.Printf("Error details: %s\n", apierr.JSON.raw)
+        } else {
+            // This is a different type of error (network, etc.)
+            fmt.Printf("Other error: %s\n", err.Error())
+        }
+    }
+}
+```
+
+<Note>
+The `errors.As` pattern allows you to distinguish between API errors (with detailed response information) and other types of errors like network failures.
+</Note>
+
+## DumpRequest() and DumpResponse() Methods
+
+The `gcore.Error` type provides methods to inspect the full HTTP request and response:
+
+### DumpRequest()
+
+Serializes the HTTP request for debugging:
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    _, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    
+    if err != nil {
+        var apierr *gcore.Error
+        if errors.As(err, &apierr) {
+            // Print the full HTTP request
+            fmt.Println(string(apierr.DumpRequest(true)))
+        }
+    }
+}
+```
+
+### DumpResponse()
+
+Serializes the HTTP response for debugging:
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    _, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    
+    if err != nil {
+        var apierr *gcore.Error
+        if errors.As(err, &apierr) {
+            // Print the full HTTP response
+            fmt.Println(string(apierr.DumpResponse(true)))
+        }
+    }
+}
+```
+
+### Complete Example with Both Methods
+
+<CodeGroup>
+```go Detailed Error Logging
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    _, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: "my-project",
+    })
+    
+    if err != nil {
+        var apierr *gcore.Error
+        if errors.As(err, &apierr) {
+            fmt.Println("=== REQUEST ===")
+            fmt.Println(string(apierr.DumpRequest(true)))
+            
+            fmt.Println("\n=== RESPONSE ===")
+            fmt.Println(string(apierr.DumpResponse(true)))
+        }
+        panic(err.Error())
+    }
+}
+```
+
+```go Without Request Body
+// If you don't want to include request/response bodies
+fmt.Println(string(apierr.DumpRequest(false)))
+fmt.Println(string(apierr.DumpResponse(false)))
+```
+</CodeGroup>
+
+<Warning>
+When dumping requests/responses with `true`, sensitive data like API keys may be included. Use `false` in production or ensure logs are secured.
+</Warning>
+
+## Common Error Scenarios
+
+### 400 Bad Request
+
+Invalid request parameters:
+
+```go
+func handleBadRequest(err error) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) && apierr.StatusCode == 400 {
+        fmt.Println("Invalid request parameters:")
+        fmt.Println(apierr.JSON.raw)
+        // Parse and show specific validation errors
+    }
+}
+```
+
+### 401 Unauthorized
+
+Authentication failure:
+
+```go
+func handleUnauthorized(err error) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) && apierr.StatusCode == 401 {
+        fmt.Println("Authentication failed. Check your API key.")
+        // Potentially refresh or re-authenticate
+    }
+}
+```
+
+### 403 Forbidden
+
+Insufficient permissions:
+
+```go
+func handleForbidden(err error) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) && apierr.StatusCode == 403 {
+        fmt.Println("Insufficient permissions for this operation.")
+        // Log for security audit
+    }
+}
+```
+
+### 404 Not Found
+
+Resource doesn't exist:
+
+```go
+func handleNotFound(err error) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) && apierr.StatusCode == 404 {
+        fmt.Println("Resource not found.")
+        // Handle missing resource gracefully
+        return nil // or create the resource
+    }
+}
+```
+
+### 429 Rate Limit
+
+Too many requests:
+
+```go
+import "time"
+
+func handleRateLimit(err error) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) && apierr.StatusCode == 429 {
+        fmt.Println("Rate limit exceeded. Waiting before retry...")
+        time.Sleep(60 * time.Second)
+        // Retry the request
+    }
+}
+```
+
+<Tip>
+The SDK automatically retries 429 errors with exponential backoff (default: 2 retries). You can configure this with `option.WithMaxRetries()`.
+</Tip>
+
+### 500+ Server Errors
+
+Internal server errors:
+
+```go
+func handleServerError(err error) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) && apierr.StatusCode >= 500 {
+        fmt.Printf("Server error: %d\n", apierr.StatusCode)
+        // Log for monitoring
+        // Retry with backoff
+    }
+}
+```
+
+## Non-API Errors
+
+Some errors are not API errors but other types of failures:
+
+```go
+import (
+    "errors"
+    "net/url"
+    "net"
+)
+
+func handleErrors(err error) {
+    // API error
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) {
+        fmt.Printf("API error: %d\n", apierr.StatusCode)
+        return
+    }
+    
+    // URL error (DNS, connection issues)
+    var urlerr *url.Error
+    if errors.As(err, &urlerr) {
+        fmt.Printf("URL error: %s\n", urlerr.Error())
+        return
+    }
+    
+    // Network error
+    var neterr *net.OpError
+    if errors.As(err, &neterr) {
+        fmt.Printf("Network error: %s\n", neterr.Error())
+        return
+    }
+    
+    // Other errors
+    fmt.Printf("Unknown error: %s\n", err.Error())
+}
+```
+
+## Error Handling Patterns
+
+### Retry with Exponential Backoff
+
+```go
+import "time"
+
+func retryWithBackoff(operation func() error, maxRetries int) error {
+    var err error
+    for i := 0; i < maxRetries; i++ {
+        err = operation()
+        if err == nil {
+            return nil
+        }
+        
+        var apierr *gcore.Error
+        if errors.As(err, &apierr) {
+            // Don't retry client errors (4xx)
+            if apierr.StatusCode >= 400 && apierr.StatusCode < 500 {
+                return err
+            }
+        }
+        
+        // Exponential backoff
+        waitTime := time.Duration(1<<uint(i)) * time.Second
+        time.Sleep(waitTime)
+    }
+    return err
+}
+```
+
+<Note>
+The SDK has built-in retry logic for connection errors, 408, 409, 429, and 5xx errors with a default of 2 retries. Use `option.WithMaxRetries()` to configure this.
+</Note>
+
+### Graceful Degradation
+
+```go
+func getProjectWithFallback(client *gcore.Client, projectID int64) (*cloud.Project, error) {
+    project, err := client.Cloud.Projects.Get(context.TODO(), projectID)
+    
+    if err != nil {
+        var apierr *gcore.Error
+        if errors.As(err, &apierr) && apierr.StatusCode == 404 {
+            // Return a default project or handle gracefully
+            return getDefaultProject(), nil
+        }
+        return nil, err
+    }
+    
+    return project, nil
+}
+```
+
+### Structured Error Logging
+
+```go
+import "log/slog"
+
+func logError(err error, operation string) {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) {
+        slog.Error("API error",
+            "operation", operation,
+            "status", apierr.StatusCode,
+            "method", apierr.Request.Method,
+            "url", apierr.Request.URL.String(),
+            "response", apierr.JSON.raw,
+        )
+    } else {
+        slog.Error("Non-API error",
+            "operation", operation,
+            "error", err.Error(),
+        )
+    }
+}
+```
+
+## Complete Error Handling Example
+
+```go
+package main
+
+import (
+    "context"
+    "errors"
+    "fmt"
+    "log"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    if err := createProject(client, "my-project"); err != nil {
+        log.Fatal(err)
+    }
+}
+
+func createProject(client *gcore.Client, name string) error {
+    project, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+        Name: name,
+    })
+    
+    if err != nil {
+        return handleProjectError(err, "create project")
+    }
+    
+    fmt.Printf("Created project: %d\n", project.ID)
+    return nil
+}
+
+func handleProjectError(err error, operation string) error {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) {
+        switch apierr.StatusCode {
+        case 400:
+            return fmt.Errorf("%s: invalid parameters - %s", operation, apierr.JSON.raw)
+        case 401:
+            return fmt.Errorf("%s: authentication failed", operation)
+        case 403:
+            return fmt.Errorf("%s: insufficient permissions", operation)
+        case 404:
+            return fmt.Errorf("%s: resource not found", operation)
+        case 429:
+            return fmt.Errorf("%s: rate limit exceeded", operation)
+        default:
+            // Log detailed error for debugging
+            log.Printf("Request: %s\n", apierr.DumpRequest(true))
+            log.Printf("Response: %s\n", apierr.DumpResponse(true))
+            return fmt.Errorf("%s: API error %d", operation, apierr.StatusCode)
+        }
+    }
+    
+    // Non-API error
+    return fmt.Errorf("%s: %w", operation, err)
+}
+```

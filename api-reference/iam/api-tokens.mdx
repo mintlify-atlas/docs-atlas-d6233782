@@ -1,0 +1,454 @@
+---
+title: "API Token Management"
+description: "Create and manage permanent API tokens for automated requests to Gcore services"
+---
+
+## Overview
+
+API tokens provide permanent authentication for automated requests to Gcore services. You can set a validity period when creating a token or issue a token for unlimited time.
+
+<Info>
+  API tokens are only shown once at creation time. Store them securely as they cannot be retrieved again.
+</Info>
+
+## Authentication with API Tokens
+
+Provide your API token in the `Authorization` header with the `APIKey` prefix:
+
+```bash
+curl -H "Authorization: APIKey 123$61b8e1e7a68c" https://api.gcore.com/iam/users/me
+```
+
+## Create API Token
+
+Create a new permanent API token for your account.
+
+```go
+import (
+    "context"
+    "time"
+    "github.com/G-Core/gcore-go/iam"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+// Create token with expiration
+expDate := time.Now().Add(365 * 24 * time.Hour).Format(time.RFC3339)
+
+token, err := client.IAM.APITokens.New(context.Background(), clientID, iam.APITokenNewParams{
+    Name:        "Production API Token",
+    Description: param.Opt("Token for production automation"),
+    ExpDate:     param.Opt(expDate),
+    ClientUser: iam.APITokenNewParamsClientUser{
+        Role: iam.UserGroupParam{
+            ID: param.Opt(int64(5)), // Engineers role
+        },
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Token created: %s\n", token.Token)
+fmt.Printf("Token ID: %d\n", token.ID)
+fmt.Printf("Expires: %s\n", token.ExpDate)
+```
+
+### Create Token Without Expiration
+
+```go
+// Create token that never expires
+token, err := client.IAM.APITokens.New(context.Background(), clientID, iam.APITokenNewParams{
+    Name:        "Permanent Token",
+    Description: param.Opt("Never expires"),
+    ClientUser: iam.APITokenNewParamsClientUser{
+        Role: iam.UserGroupParam{
+            Name: iam.UserGroupNameAdministrators,
+        },
+    },
+})
+```
+
+<ParamField path="clientID" type="int64" required>
+  The account ID for which to create the token
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  A descriptive name for the API token
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional description of the token's purpose
+</ParamField>
+
+<ParamField path="exp_date" type="string" required>
+  Token expiration date in ISO 8086/RFC 3339 format (UTC). If omitted or null, the token will never expire
+</ParamField>
+
+<ParamField path="client_user.role" type="object" required>
+  Role to assign to the token. Specify either `id` or `name`:
+  - ID `1` or name `Administrators` - Full access
+  - ID `2` or name `Users` - Standard access
+  - ID `5` or name `Engineers` - Engineering access
+  - ID `3022` or name `Purge and Prefetch only (API)` - Limited API access
+  - ID `3009` or name `Purge and Prefetch only (API+Web)` - Limited web+API access
+</ParamField>
+
+### Response
+
+<ResponseField name="token" type="string">
+  The API token string. **CRITICAL**: This is only shown once. Store it securely.
+</ResponseField>
+
+<ResponseField name="id" type="int64" required>
+  The unique identifier of the token
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The token's name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  The token's description
+</ResponseField>
+
+<ResponseField name="created" type="string" required>
+  Date when the token was created (ISO 8086/RFC 3339 format, UTC)
+</ResponseField>
+
+<ResponseField name="exp_date" type="string" required>
+  Expiration date (ISO 8086/RFC 3339 format, UTC). Null if the token never expires
+</ResponseField>
+
+<ResponseField name="expired" type="boolean" required>
+  Whether the token has expired. Expired tokens are automatically deleted
+</ResponseField>
+
+<ResponseField name="client_user" type="object" required>
+  Information about the user who created the token and the assigned role
+</ResponseField>
+
+<Warning>
+  The `token` field is only returned when creating a new token. It cannot be retrieved later, so make sure to save it immediately.
+</Warning>
+
+## List API Tokens
+
+Retrieve information about API tokens in your account. Users with the Administrators role can see all tokens.
+
+```go
+tokens, err := client.IAM.APITokens.List(context.Background(), clientID, iam.APITokenListParams{})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, token := range tokens {
+    fmt.Printf("Token: %s (ID: %d)\n", token.Name, token.ID)
+    fmt.Printf("  Created: %s\n", token.Created)
+    fmt.Printf("  Expires: %s\n", token.ExpDate)
+    fmt.Printf("  Last used: %s\n", token.LastUsage)
+}
+```
+
+### With Filters
+
+```go
+// Filter tokens by specific criteria
+tokens, err := client.IAM.APITokens.List(context.Background(), clientID, iam.APITokenListParams{
+    Deleted:     param.Opt(false), // Only active tokens
+    IssuedBy:    param.Opt(int64(123)), // Tokens issued by user 123
+    Role:        param.Opt("Engineers"), // Tokens with Engineers role
+})
+```
+
+<ParamField path="clientID" type="int64" required>
+  The account ID
+</ParamField>
+
+<ParamField path="deleted" type="boolean">
+  Filter by deletion status. `true` for deleted tokens, `false` for active tokens
+</ParamField>
+
+<ParamField path="issued_by" type="int64">
+  Filter tokens issued by a specific user ID
+</ParamField>
+
+<ParamField path="not_issued_by" type="int64">
+  Exclude tokens issued by a specific user ID
+</ParamField>
+
+<ParamField path="role" type="string">
+  Filter by role name. Values: `Administrators`, `Users`, `Engineers`, `Purge and Prefetch only (API)`, `Purge and Prefetch only (API+Web)`
+</ParamField>
+
+## Get API Token
+
+Retrieve detailed information about a specific API token.
+
+```go
+token, err := client.IAM.APITokens.Get(context.Background(), tokenID, iam.APITokenGetParams{
+    ClientID: clientID,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Token: %s\n", token.Name)
+fmt.Printf("Created by: %s\n", token.ClientUser.UserName)
+fmt.Printf("Role: %s\n", token.ClientUser.Role.Name)
+```
+
+<ParamField path="tokenID" type="int64" required>
+  The unique identifier of the token
+</ParamField>
+
+<ParamField path="clientID" type="int64" required>
+  The account ID
+</ParamField>
+
+### Response Fields
+
+<ResponseField name="id" type="int64" required>
+  The token's unique identifier
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The token's name
+</ResponseField>
+
+<ResponseField name="description" type="string">
+  The token's description
+</ResponseField>
+
+<ResponseField name="created" type="string" required>
+  Creation timestamp (ISO 8086/RFC 3339 format, UTC)
+</ResponseField>
+
+<ResponseField name="exp_date" type="string" required>
+  Expiration date (ISO 8086/RFC 3339 format, UTC). Null if never expires
+</ResponseField>
+
+<ResponseField name="expired" type="boolean" required>
+  Whether the token has expired
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean" required>
+  Whether the token has been deleted
+</ResponseField>
+
+<ResponseField name="last_usage" type="string" required>
+  Timestamp of the token's last use (ISO 8086/RFC 3339 format, UTC)
+</ResponseField>
+
+<ResponseField name="client_user" type="object" required>
+  Information about the token's creator and assigned role
+  
+  <Expandable title="client_user properties">
+    <ResponseField name="user_id" type="int64" required>
+      ID of the user who created the token
+    </ResponseField>
+    
+    <ResponseField name="user_name" type="string" required>
+      Name of the user who created the token
+    </ResponseField>
+    
+    <ResponseField name="user_email" type="string" required>
+      Email of the user who created the token
+    </ResponseField>
+    
+    <ResponseField name="client_id" type="int64" required>
+      Account ID
+    </ResponseField>
+    
+    <ResponseField name="role" type="object" required>
+      The role assigned to the token
+      
+      <Expandable title="role properties">
+        <ResponseField name="id" type="int64">
+          Role ID (1, 2, 5, 3009, or 3022)
+        </ResponseField>
+        
+        <ResponseField name="name" type="string">
+          Role name
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+    
+    <ResponseField name="deleted" type="boolean" required>
+      Whether the creator's user account has been deleted
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Delete API Token
+
+Delete an API token from your account. This action cannot be reversed.
+
+```go
+err := client.IAM.APITokens.Delete(context.Background(), tokenID, iam.APITokenDeleteParams{
+    ClientID: clientID,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Token deleted successfully")
+```
+
+<ParamField path="tokenID" type="int64" required>
+  The unique identifier of the token to delete
+</ParamField>
+
+<ParamField path="clientID" type="int64" required>
+  The account ID
+</ParamField>
+
+<Warning>
+  Ensure the token is not being used by any active applications before deletion. After deleting a token, all applications using it will lose API access immediately. This action cannot be undone.
+</Warning>
+
+## SAML SSO Considerations
+
+<Note>
+  When authorizing via SAML SSO, Gcore does not have information about permissions granted by your identity provider. Even if the provider revokes a user's access rights, their tokens remain active. You must manually delete tokens when necessary.
+</Note>
+
+## Best Practices
+
+### Token Security
+
+1. **Store tokens securely**: Use environment variables or secure vaults (never commit to source control)
+2. **Use descriptive names**: Make it easy to identify token purposes
+3. **Set expiration dates**: Tokens with expiration dates reduce security risks
+4. **Rotate regularly**: Create new tokens and delete old ones periodically
+5. **Minimum permissions**: Assign the least privileged role necessary
+
+### Token Management
+
+```go
+// Good: Token stored in environment variable
+token := os.Getenv("GCORE_API_TOKEN")
+client := gcore.NewClient(option.WithAPIKey(token))
+
+// Bad: Token hardcoded in source
+client := gcore.NewClient(option.WithAPIKey("123$abc...")) // Don't do this!
+```
+
+### Monitoring Token Usage
+
+```go
+// Check when tokens were last used
+tokens, _ := client.IAM.APITokens.List(context.Background(), clientID, iam.APITokenListParams{})
+
+for _, token := range tokens {
+    lastUsed, _ := time.Parse(time.RFC3339, token.LastUsage)
+    if time.Since(lastUsed) > 90*24*time.Hour {
+        fmt.Printf("Warning: Token %s hasn't been used in 90 days\n", token.Name)
+    }
+}
+```
+
+## Token Roles and Permissions
+
+### Administrators (ID: 1)
+- Full access to all API endpoints
+- Can manage users, tokens, and account settings
+- Best for: CI/CD pipelines requiring full access
+
+### Users (ID: 2)
+- Standard API access
+- Cannot manage account-level settings
+- Best for: General automation tasks
+
+### Engineers (ID: 5)
+- Technical operations access
+- Engineering-specific permissions
+- Best for: Development and testing environments
+
+### Purge and Prefetch only (API) (ID: 3022)
+- Limited to purge and prefetch operations
+- API access only
+- Best for: CDN cache management automation
+
+### Purge and Prefetch only (API+Web) (ID: 3009)
+- Limited to purge and prefetch operations
+- Both API and web interface access
+- Best for: Cache management with UI access
+
+## Example: Complete Token Lifecycle
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/iam"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey(os.Getenv("GCORE_API_KEY")),
+    )
+    
+    ctx := context.Background()
+    clientID := int64(12345)
+    
+    // 1. Create a new token
+    expDate := time.Now().Add(365 * 24 * time.Hour).Format(time.RFC3339)
+    newToken, err := client.IAM.APITokens.New(ctx, clientID, iam.APITokenNewParams{
+        Name:        "Automation Token",
+        Description: param.Opt("Token for automated deployments"),
+        ExpDate:     param.Opt(expDate),
+        ClientUser: iam.APITokenNewParamsClientUser{
+            Role: iam.UserGroupParam{
+                ID: param.Opt(int64(5)), // Engineers
+            },
+        },
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    // IMPORTANT: Save the token now - you can't retrieve it later!
+    fmt.Printf("Token created: %s\n", newToken.Token)
+    tokenID := newToken.ID
+    
+    // 2. List all tokens
+    tokens, err := client.IAM.APITokens.List(ctx, clientID, iam.APITokenListParams{
+        Deleted: param.Opt(false),
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Printf("\nActive tokens: %d\n", len(tokens))
+    
+    // 3. Get specific token details
+    token, err := client.IAM.APITokens.Get(ctx, tokenID, iam.APITokenGetParams{
+        ClientID: clientID,
+    })
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Printf("\nToken details:\n")
+    fmt.Printf("  Name: %s\n", token.Name)
+    fmt.Printf("  Created: %s\n", token.Created)
+    fmt.Printf("  Expires: %s\n", token.ExpDate)
+    
+    // 4. Delete the token when no longer needed
+    // Uncomment to actually delete:
+    // err = client.IAM.APITokens.Delete(ctx, tokenID, iam.APITokenDeleteParams{
+    //     ClientID: clientID,
+    // })
+    // if err != nil {
+    //     log.Fatal(err)
+    // }
+    // fmt.Println("\nToken deleted")
+}
+```

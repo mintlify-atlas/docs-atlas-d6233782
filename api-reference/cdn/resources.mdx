@@ -1,0 +1,438 @@
+---
+title: "CDN Resources"
+description: "Create and manage CDN resources for content delivery"
+---
+
+CDN resources are configurations that define how content is delivered through the CDN. Each resource includes origin settings, caching rules, SSL configuration, and various optimization options.
+
+## Create CDN Resource
+
+Create a new CDN resource with specified configuration.
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+params := cdn.CDNResourceNewParams{
+    Cname:          "cdn.example.com",
+    OriginGroup:    param.NewOpt[int64](123456),
+    Active:         gcore.Bool(true),
+    Description:    gcore.String("Production CDN resource"),
+    OriginProtocol: cdn.CDNResourceNewParamsOriginProtocolHTTPS,
+}
+
+resource, err := client.CDN.CDNResources.New(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created resource ID: %d\n", resource.ID)
+```
+
+<ParamField path="cname" type="string" required>
+  Primary delivery domain (CNAME) for content delivery. Must be added to your DNS settings
+</ParamField>
+
+<ParamField path="origin_group" type="int64">
+  Origin group ID to associate with this CDN resource
+</ParamField>
+
+<ParamField path="active" type="boolean">
+  Whether the CDN resource is active. `true` enables content delivery, `false` deactivates it
+</ParamField>
+
+<ParamField path="description" type="string">
+  Optional comment describing the CDN resource
+</ParamField>
+
+<ParamField path="name" type="string">
+  CDN resource name for identification
+</ParamField>
+
+<ParamField path="origin_protocol" type="string">
+  Protocol for CDN servers to connect to origin: `HTTP`, `HTTPS`, or `MATCH` (automatic)
+</ParamField>
+
+<ParamField path="secondary_hostnames" type="[]string">
+  Additional delivery domains (CNAMEs). Up to 10 are allowed
+</ParamField>
+
+<ParamField path="ssl_enabled" type="boolean">
+  Enable HTTPS protocol for content delivery
+</ParamField>
+
+<ParamField path="ssl_data" type="int64">
+  SSL certificate ID to use for HTTPS. Required when `ssl_enabled` is true
+</ParamField>
+
+<ParamField path="options" type="object">
+  CDN resource configuration options. See [Options](#configuration-options) section below
+</ParamField>
+
+## Get CDN Resource
+
+Retrieve details of a specific CDN resource.
+
+```go
+resource, err := client.CDN.CDNResources.Get(context.Background(), resourceID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Resource: %s (ID: %d)\n", resource.Cname, resource.ID)
+fmt.Printf("Status: %s, Active: %v\n", resource.Status, resource.Active)
+```
+
+<ResponseField name="id" type="int64">
+  CDN resource ID
+</ResponseField>
+
+<ResponseField name="cname" type="string">
+  Primary delivery domain
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the resource is active and delivering content
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Resource status: `active`, `suspended`, `processed`, or `deleted`
+</ResponseField>
+
+<ResponseField name="origin_group" type="int64">
+  Associated origin group ID
+</ResponseField>
+
+<ResponseField name="origin_protocol" type="string">
+  Protocol used to connect to origin: `HTTP`, `HTTPS`, or `MATCH`
+</ResponseField>
+
+<ResponseField name="ssl_enabled" type="boolean">
+  Whether HTTPS is enabled
+</ResponseField>
+
+<ResponseField name="ssl_data" type="int64">
+  SSL certificate ID (if HTTPS is enabled)
+</ResponseField>
+
+<ResponseField name="options" type="object">
+  Resource configuration options
+</ResponseField>
+
+## List CDN Resources
+
+Get all CDN resources in your account.
+
+```go
+params := cdn.CDNResourceListParams{
+    Limit:  param.NewOpt[int64](50),
+    Offset: param.NewOpt[int64](0),
+}
+
+resources, err := client.CDN.CDNResources.List(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, resource := range resources.Results {
+    fmt.Printf("%s - %s (ID: %d)\n", resource.Cname, resource.Status, resource.ID)
+}
+```
+
+<ParamField path="limit" type="int64">
+  Maximum number of results to return
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Number of results to skip
+</ParamField>
+
+## Update CDN Resource
+
+Modify an existing CDN resource configuration.
+
+```go
+params := cdn.CDNResourceUpdateParams{
+    Active:      param.NewOpt(true),
+    Description: param.NewOpt("Updated description"),
+}
+
+resource, err := client.CDN.CDNResources.Update(
+    context.Background(), 
+    resourceID, 
+    params,
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Delete CDN Resource
+
+Delete a CDN resource permanently. The resource must be deactivated first.
+
+```go
+// First deactivate the resource
+updateParams := cdn.CDNResourceUpdateParams{
+    Active: param.NewOpt(false),
+}
+_, err := client.CDN.CDNResources.Update(context.Background(), resourceID, updateParams)
+if err != nil {
+    log.Fatal(err)
+}
+
+// Then delete
+err = client.CDN.CDNResources.Delete(context.Background(), resourceID)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<Note>
+  Statistics will be available for 365 days after deletion. This action is irreversible.
+</Note>
+
+## Deactivate and Delete
+
+Utility method that deactivates and deletes a resource in one call.
+
+```go
+err := client.CDN.CDNResources.DeactivateAndDelete(
+    context.Background(), 
+    resourceID,
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+## Cache Operations
+
+### Purge Cache
+
+Delete cached content from CDN servers to update content.
+
+**Purge by URL:**
+
+```go
+params := cdn.CDNResourcePurgeParams{
+    OfPurgeByURL: &cdn.CDNResourcePurgeParamsBodyPurgeByURL{
+        Urls: []string{
+            "http://cdn.example.com/image1.jpg",
+            "http://cdn.example.com/image2.jpg",
+        },
+    },
+}
+
+err := client.CDN.CDNResources.Purge(context.Background(), resourceID, params)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+**Purge by Pattern:**
+
+```go
+params := cdn.CDNResourcePurgeParams{
+    OfPurgeByPath: &cdn.CDNResourcePurgeParamsBodyPurgeByPath{
+        Paths: []string{
+            "/images/*.jpg",
+            "/css/*",
+        },
+    },
+}
+
+err := client.CDN.CDNResources.Purge(context.Background(), resourceID, params)
+```
+
+**Purge All:**
+
+```go
+params := cdn.CDNResourcePurgeParams{
+    OfPurgeAll: &cdn.CDNResourcePurgeParamsBodyPurgeAll{},
+}
+
+err := client.CDN.CDNResources.Purge(context.Background(), resourceID, params)
+```
+
+<Note>
+  **Rate Limits:**
+  - Purge all: 1 request per resource per minute
+  - Purge by URL: 2 requests per resource per minute, max 100 URLs per request
+  - Purge by pattern: 1 request per resource per minute, max 10 patterns per request
+</Note>
+
+### Prefetch Content
+
+Pre-populate files to CDN cache before user requests. Recommended for files between 200 MB and 5 GB.
+
+```go
+params := cdn.CDNResourcePrefetchParams{
+    Paths: []string{
+        "/videos/large-video.mp4",
+        "/files/software-installer.exe",
+    },
+}
+
+err := client.CDN.CDNResources.Prefetch(context.Background(), resourceID, params)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="paths" type="[]string" required>
+  List of file paths to prefetch. Maximum 100 paths per request
+</ParamField>
+
+<Note>
+  Rate limit: 1 prefetch request per resource per minute. If updating files, purge them first before prefetching.
+</Note>
+
+## SSL Certificate Operations
+
+### Prevalidate Let's Encrypt Certificate
+
+Check if a Let's Encrypt certificate can be issued for the resource.
+
+```go
+err := client.CDN.CDNResources.PrevalidateSslLeCertificate(
+    context.Background(), 
+    resourceID,
+)
+if err != nil {
+    log.Printf("Certificate cannot be issued: %v", err)
+} else {
+    fmt.Println("Certificate can be issued")
+}
+```
+
+## Configuration Options
+
+CDN resources support extensive configuration options for caching, compression, security, and delivery optimization.
+
+### Caching Options
+
+```go
+params := cdn.CDNResourceNewParams{
+    Cname: "cdn.example.com",
+    Options: cdn.CDNResourceNewParamsOptions{
+        EdgeCacheSettings: cdn.CDNResourceNewParamsOptionsEdgeCacheSettings{
+            Enabled: true,
+            Value:   gcore.String("86400s"), // 24 hours
+        },
+        BrowserCacheSettings: cdn.CDNResourceNewParamsOptionsBrowserCacheSettings{
+            Enabled: true,
+            Value:   "3600s", // 1 hour
+        },
+    },
+}
+```
+
+### Compression Options
+
+```go
+Options: cdn.CDNResourceNewParamsOptions{
+    GzipOn: cdn.CDNResourceNewParamsOptionsGzipOn{
+        Enabled: true,
+        Value:   true,
+    },
+    BrotliCompression: cdn.CDNResourceNewParamsOptionsBrotliCompression{
+        Enabled: true,
+        Value:   []string{"text/html", "text/css", "application/javascript"},
+    },
+}
+```
+
+### Security Options
+
+```go
+Options: cdn.CDNResourceNewParamsOptions{
+    IPAddressACL: cdn.CDNResourceNewParamsOptionsIPAddressACL{
+        Enabled:        true,
+        PolicyType:     "deny",
+        ExceptedValues: []string{"192.168.1.0/24", "10.0.0.0/8"},
+    },
+    CountryACL: cdn.CDNResourceNewParamsOptionsCountryACL{
+        Enabled:        true,
+        PolicyType:     "allow",
+        ExceptedValues: []string{"US", "GB", "DE"},
+    },
+}
+```
+
+### CORS Configuration
+
+```go
+Options: cdn.CDNResourceNewParamsOptions{
+    Cors: cdn.CDNResourceNewParamsOptionsCors{
+        Enabled: true,
+        Value:   []string{"*"},
+        Always:  gcore.Bool(true),
+    },
+}
+```
+
+## Complete Example
+
+Here's a complete example from the SDK examples:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+func main() {
+    client := gcore.NewClient()
+
+    // Create a CDN resource
+    cname := fmt.Sprintf("cdn-example-%d.example.com", time.Now().Unix())
+
+    params := cdn.CDNResourceNewParams{
+        Cname:       cname,
+        OriginGroup: param.NewOpt[int64](123456),
+        Active:      gcore.Bool(true),
+    }
+
+    resource, err := client.CDN.CDNResources.New(context.Background(), params)
+    if err != nil {
+        log.Fatalf("Error creating CDN resource: %v", err)
+    }
+
+    fmt.Printf("Created CDN Resource: ID=%d, Cname=%s\n", 
+        resource.ID, resource.Cname)
+
+    // Deactivate and delete when done
+    err = client.CDN.CDNResources.DeactivateAndDelete(
+        context.Background(), 
+        resource.ID,
+    )
+    if err != nil {
+        log.Fatalf("Error deleting resource: %v", err)
+    }
+
+    fmt.Println("Resource successfully deleted")
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Resource Rules" icon="list-check" href="/api-reference/cdn/rules">
+    Configure custom rules for specific URL patterns
+  </Card>
+  <Card title="SSL Certificates" icon="lock" href="/api-reference/cdn/certificates">
+    Manage SSL/TLS certificates for HTTPS
+  </Card>
+</CardGroup>

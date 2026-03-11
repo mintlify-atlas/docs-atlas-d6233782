@@ -1,0 +1,387 @@
+---
+title: 'Bucket Management'
+description: 'Create and manage S3 buckets within S3-compatible storage'
+---
+
+## Overview
+
+Buckets are containers for storing objects in S3-compatible storage. The Bucket service provides methods to create, list, and delete buckets, as well as configure:
+
+- **Lifecycle Policies**: Automatic object expiration
+- **CORS Rules**: Cross-origin resource sharing for web applications
+- **Access Policies**: Public/private bucket access control
+
+<Note>
+Bucket operations are only available for S3-compatible storage, not SFTP storage.
+</Note>
+
+## Creating a Bucket
+
+Create a new bucket within an S3 storage:
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/storage"
+)
+
+client := gcore.NewClient()
+
+params := storage.BucketNewParams{
+    StorageID: storageID,
+}
+
+err := client.Storage.Buckets.New(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+```
+
+### Parameters
+
+<ParamField path="bucket_name" type="string" required>
+  Name of the bucket to create. Must be unique within the storage.
+</ParamField>
+
+<ParamField body="storage_id" type="int64" required>
+  ID of the S3 storage where the bucket will be created
+</ParamField>
+
+## Listing Buckets
+
+Retrieve all buckets for a storage:
+
+```go
+params := storage.BucketListParams{
+    Limit:  param.NewOpt(int64(50)),
+    Offset: param.NewOpt(int64(0)),
+}
+
+buckets, err := client.Storage.Buckets.List(
+    context.Background(),
+    storageID,
+    params,
+)
+if err != nil {
+    // Handle error
+}
+
+for _, bucket := range buckets.Results {
+    fmt.Printf("Bucket: %s\n", bucket.Name)
+    if bucket.Lifecycle > 0 {
+        fmt.Printf("  Lifecycle: %d days\n", bucket.Lifecycle)
+    }
+}
+```
+
+### Parameters
+
+<ParamField path="storage_id" type="int64" required>
+  ID of the storage to list buckets from
+</ParamField>
+
+<ParamField query="limit" type="int64">
+  Maximum number of buckets to return
+</ParamField>
+
+<ParamField query="offset" type="int64">
+  Number of buckets to skip before beginning to return results
+</ParamField>
+
+### Response
+
+Returns a paginated list of buckets:
+
+<ResponseField name="count" type="int64">
+  Total number of buckets (independent of pagination)
+</ResponseField>
+
+<ResponseField name="results" type="array">
+  Array of bucket objects
+  <Expandable title="Bucket properties">
+    <ResponseField name="name" type="string" required>
+      Name of the S3 bucket
+    </ResponseField>
+    <ResponseField name="lifecycle" type="int64">
+      Lifecycle policy expiration days (0 if not set)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Auto-Pagination
+
+For easier iteration over all buckets:
+
+```go
+pager := client.Storage.Buckets.ListAutoPaging(
+    context.Background(),
+    storageID,
+    storage.BucketListParams{},
+)
+
+for pager.Next() {
+    bucket := pager.Current()
+    fmt.Printf("Bucket: %s\n", bucket.Name)
+}
+
+if err := pager.Err(); err != nil {
+    // Handle error
+}
+```
+
+## Deleting a Bucket
+
+Remove a bucket and all its objects:
+
+<Warning>
+All objects in the bucket will be automatically deleted before the bucket is removed. This action cannot be undone.
+</Warning>
+
+```go
+params := storage.BucketDeleteParams{
+    StorageID: storageID,
+}
+
+err := client.Storage.Buckets.Delete(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+```
+
+### Parameters
+
+<ParamField path="bucket_name" type="string" required>
+  Name of the bucket to delete
+</ParamField>
+
+<ParamField body="storage_id" type="int64" required>
+  ID of the storage containing the bucket
+</ParamField>
+
+## Configuring CORS
+
+Set up Cross-Origin Resource Sharing rules:
+
+```go
+params := storage.BucketCorNewParams{
+    StorageID:      storageID,
+    AllowedOrigins: []string{"https://example.com", "https://app.example.com"},
+}
+
+err := client.Storage.Buckets.Cors.New(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+```
+
+### Allow All Origins
+
+To allow requests from any origin:
+
+```go
+params := storage.BucketCorNewParams{
+    StorageID:      storageID,
+    AllowedOrigins: []string{"*"},
+}
+```
+
+### Getting CORS Configuration
+
+```go
+params := storage.BucketCorGetParams{
+    StorageID: storageID,
+}
+
+corsConfig, err := client.Storage.Buckets.Cors.Get(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+
+fmt.Printf("Allowed Origins: %v\n", corsConfig.AllowedOrigins)
+```
+
+## Managing Access Policies
+
+### Making a Bucket Public
+
+Apply a public read policy to allow anonymous access:
+
+```go
+params := storage.BucketPolicyNewParams{
+    StorageID: storageID,
+}
+
+err := client.Storage.Buckets.Policy.New(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+```
+
+<Info>
+Public read policy allows anonymous users to download objects via HTTP GET requests. Users cannot upload, modify, or delete objects without authentication.
+</Info>
+
+### Making a Bucket Private
+
+Remove the public read policy:
+
+```go
+params := storage.BucketPolicyDeleteParams{
+    StorageID: storageID,
+}
+
+err := client.Storage.Buckets.Policy.Delete(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+```
+
+### Checking Policy Status
+
+```go
+params := storage.BucketPolicyGetParams{
+    StorageID: storageID,
+}
+
+isPublic, err := client.Storage.Buckets.Policy.Get(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+
+if *isPublic {
+    fmt.Println("Bucket is public")
+} else {
+    fmt.Println("Bucket is private")
+}
+```
+
+## Complete Example
+
+Here's a complete example demonstrating bucket management:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/packages/param"
+    "github.com/G-Core/gcore-go/storage"
+)
+
+func main() {
+    client := gcore.NewClient()
+    ctx := context.Background()
+    
+    // Assume we have an S3 storage with ID storageID
+    var storageID int64 = 12345
+    
+    // Create a bucket
+    bucketName := "example-bucket"
+    err := client.Storage.Buckets.New(
+        ctx,
+        bucketName,
+        storage.BucketNewParams{StorageID: storageID},
+    )
+    if err != nil {
+        log.Fatalf("Failed to create bucket: %v", err)
+    }
+    
+    // Set lifecycle policy (expire after 30 days)
+    err = client.Storage.Buckets.Lifecycle.New(
+        ctx,
+        bucketName,
+        storage.BucketLifecycleNewParams{
+            StorageID:      storageID,
+            ExpirationDays: param.NewOpt(int64(30)),
+        },
+    )
+    if err != nil {
+        log.Printf("Failed to set lifecycle: %v", err)
+    }
+    
+    // Configure CORS
+    err = client.Storage.Buckets.Cors.New(
+        ctx,
+        bucketName,
+        storage.BucketCorNewParams{
+            StorageID:      storageID,
+            AllowedOrigins: []string{"*"},
+        },
+    )
+    if err != nil {
+        log.Printf("Failed to set CORS: %v", err)
+    }
+    
+    // Make bucket public
+    err = client.Storage.Buckets.Policy.New(
+        ctx,
+        bucketName,
+        storage.BucketPolicyNewParams{StorageID: storageID},
+    )
+    if err != nil {
+        log.Printf("Failed to set policy: %v", err)
+    }
+    
+    // List all buckets
+    buckets, err := client.Storage.Buckets.List(
+        ctx,
+        storageID,
+        storage.BucketListParams{},
+    )
+    if err != nil {
+        log.Fatalf("Failed to list buckets: %v", err)
+    }
+    
+    for _, bucket := range buckets.Results {
+        fmt.Printf("Bucket: %s (lifecycle: %d days)\n",
+            bucket.Name, bucket.Lifecycle)
+    }
+}
+```
+
+## Best Practices
+
+1. **Naming Conventions**: Use lowercase letters, numbers, and hyphens in bucket names
+2. **Lifecycle Policies**: Set expiration policies to manage storage costs
+3. **CORS Configuration**: Only allow specific origins for production environments
+4. **Access Control**: Keep buckets private unless public access is required
+5. **Error Handling**: Always check for errors when performing bucket operations
+
+## See Also
+
+- [Storage Overview](/api-reference/storage/overview)
+- [Lifecycle Policies](/api-reference/storage/lifecycle)
+- [Storage Credentials](/api-reference/storage/credentials)

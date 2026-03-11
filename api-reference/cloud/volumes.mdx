@@ -1,0 +1,423 @@
+---
+title: 'Block Storage Volumes'
+description: 'Create and manage block storage volumes that can be attached to instances'
+---
+
+Volumes are block storage devices that can be attached to instances as boot or data disks, with support for resizing and type changes.
+
+## Methods
+
+### New
+
+Create a new volume from scratch, an image, or a snapshot.
+
+```go
+func (r *VolumeService) New(ctx context.Context, params VolumeNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *VolumeService) NewAndPoll(ctx context.Context, params VolumeNewParams, opts ...option.RequestOption) (*Volume, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Volume name
+</ParamField>
+
+<ParamField path="size" type="int64" required>
+  Volume size in GiB
+</ParamField>
+
+<ParamField path="source" type="string" required>
+  Volume source: `new-volume`, `image`, or `snapshot`
+</ParamField>
+
+<ParamField path="image_id" type="string">
+  Image ID (required if source is `image`)
+</ParamField>
+
+<ParamField path="snapshot_id" type="string">
+  Snapshot ID (required if source is `snapshot`)
+</ParamField>
+
+<ParamField path="type_name" type="string">
+  Volume type: `standard`, `ssd_hiiops`, `ssd_local`, `ssd_lowlatency`, `cold`, `ultra`. Defaults to `standard`
+</ParamField>
+
+<ParamField path="instance_id_to_attach_to" type="string">
+  Instance ID to attach volume during creation
+</ParamField>
+
+<ParamField path="attachment_tag" type="string">
+  Block device attachment tag (use with instance_id_to_attach_to)
+</ParamField>
+
+<ParamField path="lifecycle_policy_ids" type="[]int64">
+  Snapshot schedule policy IDs
+</ParamField>
+
+<ParamField path="tags" type="map[string]string">
+  Key-value tags
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Volume UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Volume name
+</ResponseField>
+
+<ResponseField name="size" type="int64">
+  Volume size in GiB
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Volume status: available, in-use, creating, deleting, error, etc.
+</ResponseField>
+
+<ResponseField name="volume_type" type="string">
+  Volume storage type
+</ResponseField>
+
+<ResponseField name="bootable" type="bool">
+  Whether the volume is bootable
+</ResponseField>
+
+<ResponseField name="attachments" type="[]VolumeAttachment">
+  List of instance attachments
+</ResponseField>
+
+### Update
+
+Rename a volume or update tags.
+
+```go
+func (r *VolumeService) Update(ctx context.Context, volumeID string, params VolumeUpdateParams, opts ...option.RequestOption) (*Volume, error)
+```
+
+<ParamField path="name" type="string">
+  New volume name
+</ParamField>
+
+<ParamField path="tags" type="TagUpdateMap">
+  Tags to add, update, or remove
+</ParamField>
+
+### List
+
+List volumes with optional filtering.
+
+```go
+func (r *VolumeService) List(ctx context.Context, params VolumeListParams, opts ...option.RequestOption) (*pagination.OffsetPage[Volume], error)
+func (r *VolumeService) ListAutoPaging(ctx context.Context, params VolumeListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[Volume]
+```
+
+<ParamField path="bootable" type="bool">
+  Filter by bootable status
+</ParamField>
+
+<ParamField path="has_attachments" type="bool">
+  Filter by attachment presence
+</ParamField>
+
+<ParamField path="instance_id" type="string">
+  Filter by attached instance ID
+</ParamField>
+
+<ParamField path="name_part" type="string">
+  Filter by name substring
+</ParamField>
+
+<ParamField path="limit" type="int64">
+  Maximum results per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Results to skip
+</ParamField>
+
+### Get
+
+Retrieve detailed information about a volume.
+
+```go
+func (r *VolumeService) Get(ctx context.Context, volumeID string, query VolumeGetParams, opts ...option.RequestOption) (*Volume, error)
+```
+
+### Delete
+
+Delete a volume and optionally its snapshots.
+
+```go
+func (r *VolumeService) Delete(ctx context.Context, volumeID string, params VolumeDeleteParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *VolumeService) DeleteAndPoll(ctx context.Context, volumeID string, params VolumeDeleteParams, opts ...option.RequestOption) error
+```
+
+<ParamField path="snapshots" type="string">
+  Comma-separated list of snapshot IDs to delete with the volume
+</ParamField>
+
+<Warning>
+  Volume must be in `available` state to be deleted.
+</Warning>
+
+### AttachToInstance
+
+Attach a volume to an instance.
+
+```go
+func (r *VolumeService) AttachToInstance(ctx context.Context, volumeID string, params VolumeAttachToInstanceParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *VolumeService) AttachToInstanceAndPoll(ctx context.Context, volumeID string, params VolumeAttachToInstanceParams, opts ...option.RequestOption) error
+```
+
+<ParamField path="instance_id" type="string" required>
+  Instance UUID
+</ParamField>
+
+<ParamField path="attachment_tag" type="string">
+  Block device attachment tag
+</ParamField>
+
+### DetachFromInstance
+
+Detach a volume from an instance.
+
+```go
+func (r *VolumeService) DetachFromInstance(ctx context.Context, volumeID string, params VolumeDetachFromInstanceParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *VolumeService) DetachFromInstanceAndPoll(ctx context.Context, volumeID string, params VolumeDetachFromInstanceParams, opts ...option.RequestOption) error
+```
+
+<ParamField path="instance_id" type="string" required>
+  Instance UUID
+</ParamField>
+
+### Resize
+
+Increase the size of a volume.
+
+```go
+func (r *VolumeService) Resize(ctx context.Context, volumeID string, params VolumeResizeParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *VolumeService) ResizeAndPoll(ctx context.Context, volumeID string, params VolumeResizeParams, opts ...option.RequestOption) (*Volume, error)
+```
+
+<ParamField path="size" type="int64" required>
+  New size in GiB (must be greater than current size)
+</ParamField>
+
+### ChangeType
+
+Change the volume type.
+
+```go
+func (r *VolumeService) ChangeType(ctx context.Context, volumeID string, params VolumeChangeTypeParams, opts ...option.RequestOption) (*Volume, error)
+```
+
+<ParamField path="volume_type" type="string" required>
+  New volume type: `standard` or `ssd_hiiops`
+</ParamField>
+
+<Warning>
+  Volume must not have snapshots to change type.
+</Warning>
+
+### RevertToLastSnapshot
+
+Revert a volume to its last snapshot.
+
+```go
+func (r *VolumeService) RevertToLastSnapshot(ctx context.Context, volumeID string, body VolumeRevertToLastSnapshotParams, opts ...option.RequestOption) error
+```
+
+<Warning>
+  Volume must be in `available` state to be reverted.
+</Warning>
+
+## Examples
+
+### Create an Empty Volume
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/shared/constant"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+volume, err := client.Cloud.Volumes.NewAndPoll(context.Background(), 
+    cloud.VolumeNewParams{
+        OfNewVolume: &cloud.VolumeNewParamsBodyNewVolume{
+            Source:   constant.ValueOf[constant.NewVolume](),
+            Name:     "data-volume",
+            Size:     100, // 100 GB
+            TypeName: "ssd_hiiops",
+            Tags:     map[string]string{"purpose": "database"},
+        },
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created volume: %s\n", volume.ID)
+```
+
+### Create Volume from Image
+
+```go
+volume, err := client.Cloud.Volumes.NewAndPoll(context.Background(), 
+    cloud.VolumeNewParams{
+        OfImage: &cloud.VolumeNewParamsBodyImage{
+            Source:   constant.ValueOf[constant.Image](),
+            Name:     "boot-volume",
+            ImageID:  "image-uuid",
+            Size:     20,
+            TypeName: "standard",
+        },
+    },
+)
+```
+
+### Create and Attach Volume
+
+```go
+volume, err := client.Cloud.Volumes.NewAndPoll(context.Background(), 
+    cloud.VolumeNewParams{
+        OfNewVolume: &cloud.VolumeNewParamsBodyNewVolume{
+            Source:               constant.ValueOf[constant.NewVolume](),
+            Name:                 "attached-volume",
+            Size:                 50,
+            InstanceIDToAttachTo: gcore.String(instanceID),
+        },
+    },
+)
+```
+
+### List All Volumes
+
+```go
+volumes, err := client.Cloud.Volumes.List(context.Background(), 
+    cloud.VolumeListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, vol := range volumes.Results {
+    fmt.Printf("Volume: %s, Size: %d GB, Status: %s\n", 
+        vol.Name, vol.Size, vol.Status)
+}
+```
+
+### List Volumes Attached to Instance
+
+```go
+volumes, err := client.Cloud.Volumes.List(context.Background(), 
+    cloud.VolumeListParams{
+        InstanceID: gcore.String(instanceID),
+    },
+)
+```
+
+### Attach Volume to Instance
+
+```go
+err := client.Cloud.Volumes.AttachToInstanceAndPoll(context.Background(), 
+    volumeID,
+    cloud.VolumeAttachToInstanceParams{
+        InstanceID: instanceID,
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Detach Volume from Instance
+
+```go
+err := client.Cloud.Volumes.DetachFromInstanceAndPoll(context.Background(), 
+    volumeID,
+    cloud.VolumeDetachFromInstanceParams{
+        InstanceID: instanceID,
+    },
+)
+```
+
+### Resize a Volume
+
+```go
+volume, err := client.Cloud.Volumes.ResizeAndPoll(context.Background(), 
+    volumeID,
+    cloud.VolumeResizeParams{
+        Size: 200, // Expand to 200 GB
+    },
+)
+```
+
+### Change Volume Type
+
+```go
+volume, err := client.Cloud.Volumes.ChangeType(context.Background(), 
+    volumeID,
+    cloud.VolumeChangeTypeParams{
+        VolumeType: cloud.VolumeChangeTypeParamsVolumeTypeSsdHiiops,
+    },
+)
+```
+
+### Delete Volume
+
+```go
+err := client.Cloud.Volumes.DeleteAndPoll(context.Background(), 
+    volumeID,
+    cloud.VolumeDeleteParams{},
+)
+```
+
+## Common Use Cases
+
+### Create Database Volume with Snapshots
+
+```go
+volume, err := client.Cloud.Volumes.NewAndPoll(context.Background(), 
+    cloud.VolumeNewParams{
+        OfNewVolume: &cloud.VolumeNewParamsBodyNewVolume{
+            Source:             constant.ValueOf[constant.NewVolume](),
+            Name:               "postgres-data",
+            Size:               500,
+            TypeName:           "ssd_hiiops",
+            LifecyclePolicyIDs: []int64{policyID}, // Daily snapshots
+            Tags:               map[string]string{
+                "database": "postgres",
+                "environment": "production",
+            },
+        },
+    },
+)
+```
+
+### Clone Volume from Snapshot
+
+```go
+volume, err := client.Cloud.Volumes.NewAndPoll(context.Background(), 
+    cloud.VolumeNewParams{
+        OfSnapshot: &cloud.VolumeNewParamsBodySnapshot{
+            Source:     constant.ValueOf[constant.Snapshot](),
+            Name:       "cloned-volume",
+            SnapshotID: snapshotID,
+        },
+    },
+)
+```

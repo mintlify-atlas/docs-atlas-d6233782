@@ -1,0 +1,68 @@
+---
+title: "Timeouts"
+description: "Learn how to configure request timeouts in the Gcore Go SDK"
+---
+
+## Overview
+
+Requests do not time out by default. Use context to configure a timeout for a request lifecycle.
+
+<Warning>
+If a request is [retried](/advanced/retries), the context timeout does not start over. To set a per-retry timeout, use `option.WithRequestTimeout()`.
+</Warning>
+
+## Setting Request Timeouts
+
+You can configure two types of timeouts:
+1. **Overall timeout**: The total time for the request including all retries
+2. **Per-retry timeout**: The time limit for each individual retry attempt
+
+### Complete Example
+
+```go
+// This sets the timeout for the request, including all the retries.
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+client.Cloud.Projects.New(
+	ctx,
+	cloud.ProjectNewParams{
+		Name: "my-project",
+	},
+	// This sets the per-retry timeout
+	option.WithRequestTimeout(20*time.Second),
+)
+```
+
+## Timeout Types
+
+### Overall Timeout
+
+Use Go's standard `context.WithTimeout()` to set the total time allowed for the entire request, including all retry attempts.
+
+```go
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+```
+
+<Info>
+The context timeout applies to the entire request lifecycle, including all retry attempts.
+</Info>
+
+### Per-Retry Timeout
+
+Use `option.WithRequestTimeout()` to set a timeout for each individual retry attempt.
+
+```go
+option.WithRequestTimeout(20*time.Second)
+```
+
+<Note>
+The per-retry timeout resets for each retry attempt, allowing you to limit how long each individual attempt can take.
+</Note>
+
+## Best Practices
+
+- Always use `defer cancel()` when creating a context with timeout
+- Set reasonable per-retry timeouts to prevent individual attempts from hanging
+- Consider the total number of retries when setting the overall timeout
+- For long-running operations, use appropriate timeout values that account for expected processing time

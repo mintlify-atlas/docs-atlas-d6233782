@@ -1,0 +1,751 @@
+---
+title: 'DNS Records'
+description: 'Manage DNS resource record sets with dynamic routing and failover'
+---
+
+DNS resource record sets (RRsets) define individual DNS records such as A, AAAA, CNAME, MX, and TXT with TTL, geo-balancing, and failover settings.
+
+## Supported Record Types
+
+- **A** - IPv4 address records
+- **AAAA** - IPv6 address records
+- **CNAME** - Canonical name (alias) records
+- **MX** - Mail exchange records
+- **TXT** - Text records
+- **SRV** - Service locator records
+- **NS** - Name server records
+- **SOA** - Start of authority (managed automatically)
+
+## Create Record
+
+Add a new DNS record to a zone. Records can be static or dynamic with advanced routing.
+
+### Simple A Record
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(3600)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+            Enabled: gcore.F(true),
+        },
+    }),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Record created: %s\n", record.Name)
+```
+
+```json Response
+{
+  "name": "www.example.com",
+  "type": "A",
+  "ttl": 3600,
+  "resource_records": [
+    {
+      "id": 12345,
+      "content": ["192.0.2.1"],
+      "enabled": true,
+      "meta": {}
+    }
+  ],
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
+</CodeGroup>
+
+### Parameters
+
+<ParamField path="zoneName" type="string" required>
+  Name of the DNS zone
+</ParamField>
+
+<ParamField path="rrsetName" type="string" required>
+  Record name (use "@" for zone apex)
+</ParamField>
+
+<ParamField path="rrsetType" type="string" required>
+  Record type: A, AAAA, CNAME, MX, TXT, SRV, NS
+</ParamField>
+
+<ParamField path="ttl" type="integer" default={3600}>
+  Time to live in seconds
+</ParamField>
+
+<ParamField path="resource_records" type="array" required>
+  Array of resource records
+  
+  <Expandable title="properties">
+    <ParamField path="content" type="array" required>
+      Record content. Format varies by type:
+      - **A**: `["192.0.2.1"]`
+      - **AAAA**: `["2001:db8::1"]`
+      - **CNAME**: `["target.example.com"]`
+      - **MX**: `[10, "mail.example.com"]`
+      - **TXT**: `["v=spf1 include:_spf.example.com ~all"]`
+      - **SRV**: `[100, 1, 5061, "sip.example.com"]`
+    </ParamField>
+    
+    <ParamField path="enabled" type="boolean" default={true}>
+      Whether this record is active
+    </ParamField>
+    
+    <ParamField path="meta" type="object">
+      Metadata for geo-routing and load balancing (see Dynamic Records section)
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+### Record Type Examples
+
+<CodeGroup>
+```go AAAA Record
+record, err := client.DNS.Zones.Rrsets.New(ctx, "AAAA", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(3600)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"2001:db8::1"},
+            Enabled: gcore.F(true),
+        },
+    }),
+})
+```
+
+```go CNAME Record
+record, err := client.DNS.Zones.Rrsets.New(ctx, "CNAME", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "blog",
+    Ttl: gcore.F(int64(3600)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"target.example.com"},
+        },
+    }),
+})
+```
+
+```go MX Record
+record, err := client.DNS.Zones.Rrsets.New(ctx, "MX", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "@",
+    Ttl: gcore.F(int64(3600)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{10, "mail1.example.com"},
+        },
+        {
+            Content: []any{20, "mail2.example.com"},
+        },
+    }),
+})
+```
+
+```go TXT Record
+record, err := client.DNS.Zones.Rrsets.New(ctx, "TXT", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "@",
+    Ttl: gcore.F(int64(3600)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"v=spf1 include:_spf.google.com ~all"},
+        },
+    }),
+})
+```
+
+```go SRV Record
+record, err := client.DNS.Zones.Rrsets.New(ctx, "SRV", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "_sip._tcp",
+    Ttl: gcore.F(int64(3600)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{100, 1, 5061, "sip.example.com"},
+        },
+    }),
+})
+```
+</CodeGroup>
+
+## Dynamic Records with Geo-Routing
+
+Dynamic RRsets enable advanced traffic routing based on user location, ASN, health checks, and weighted distribution.
+
+### Geo-Distance Routing
+
+Route users to the nearest server based on geographic coordinates.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(300)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "latlong": []float64{37.7749, -122.4194}, // San Francisco
+                "notes": "US West Coast server",
+            },
+        },
+        {
+            Content: []any{"192.0.2.2"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "latlong": []float64{40.7128, -74.0060}, // New York
+                "notes": "US East Coast server",
+            },
+        },
+        {
+            Content: []any{"192.0.2.3"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "latlong": []float64{51.5074, -0.1278}, // London
+                "notes": "EU server",
+            },
+        },
+    }),
+    Pickers: gcore.F([]dns.ZoneRrsetNewParamsPicker{
+        {
+            Type: "geodistance",
+        },
+        {
+            Type: "first_n",
+            Limit: gcore.F(int64(1)),
+        },
+    }),
+})
+```
+</CodeGroup>
+
+### Country-Based Routing
+
+Route traffic based on user's country.
+
+<CodeGroup>
+```go Code
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(300)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+            Meta: map[string]any{
+                "countries": []string{"us", "ca", "mx"},
+            },
+        },
+        {
+            Content: []any{"192.0.2.2"},
+            Meta: map[string]any{
+                "countries": []string{"de", "fr", "gb"},
+            },
+        },
+        {
+            Content: []any{"192.0.2.3"},
+            Meta: map[string]any{
+                "default": true, // Fallback for other countries
+            },
+        },
+    }),
+    Pickers: gcore.F([]dns.ZoneRrsetNewParamsPicker{
+        {
+            Type: "geodns",
+            Strict: gcore.F(false),
+        },
+    }),
+})
+```
+</CodeGroup>
+
+### Weighted Load Balancing
+
+Distribute traffic based on weights.
+
+<CodeGroup>
+```go Code
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(300)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+            Meta: map[string]any{
+                "weight": 70, // 70% of traffic
+            },
+        },
+        {
+            Content: []any{"192.0.2.2"},
+            Meta: map[string]any{
+                "weight": 30, // 30% of traffic
+            },
+        },
+    }),
+    Pickers: gcore.F([]dns.ZoneRrsetNewParamsPicker{
+        {
+            Type: "weighted_shuffle",
+        },
+        {
+            Type: "first_n",
+            Limit: gcore.F(int64(2)),
+        },
+    }),
+})
+```
+</CodeGroup>
+
+## Picker Types
+
+Pickers are applied in order to determine which records are returned.
+
+### Selectors
+
+<ParamField path="geodns" type="picker">
+  Filter records by IP, ASN, region, country, or continent
+  - `strict: true` - Return no answers if no match found
+  - `strict: false` - Return all records if no match found
+</ParamField>
+
+<ParamField path="asn" type="picker">
+  Select records matching requestor's ASN
+</ParamField>
+
+<ParamField path="country" type="picker">
+  Select records matching requestor's country
+</ParamField>
+
+<ParamField path="continent" type="picker">
+  Select records matching requestor's continent
+</ParamField>
+
+<ParamField path="region" type="picker">
+  Select records matching requestor's region (e.g., "fr-nor" for France/Normandy)
+</ParamField>
+
+<ParamField path="ip" type="picker">
+  Select records matching requestor's IP subnet (max 100 subnets per record)
+</ParamField>
+
+<ParamField path="default" type="picker">
+  Select records marked with `"default": true` in metadata
+</ParamField>
+
+### Mutators
+
+<ParamField path="geodistance" type="picker">
+  Sort records by distance from requestor (requires `latlong` metadata)
+</ParamField>
+
+<ParamField path="weighted_shuffle" type="picker">
+  Randomize records based on `weight` metadata (default weight: 50)
+</ParamField>
+
+### Filters
+
+<ParamField path="first_n" type="picker">
+  Return only the first N records
+  - `limit: 1` - Return only first record
+  - `limit: 0` - Return all records (no limit)
+</ParamField>
+
+## Health Checks and Failover
+
+Configure health checks to automatically failover to backup servers.
+
+<CodeGroup>
+```go HTTP Health Check
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(60)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+            Enabled: gcore.F(true),
+        },
+        {
+            Content: []any{"192.0.2.2"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "backup": true,
+            },
+        },
+    }),
+    Meta: map[string]any{
+        "failover": map[string]any{
+            "protocol": "HTTP",
+            "port": 443,
+            "frequency": 30,
+            "timeout": 5,
+            "method": "GET",
+            "url": "/health",
+            "tls": true,
+            "http_status_code": 200,
+            "host": "www.example.com",
+        },
+    },
+})
+```
+
+```go ICMP Health Check
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(60)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+        },
+    }),
+    Meta: map[string]any{
+        "failover": map[string]any{
+            "protocol": "ICMP",
+            "frequency": 60,
+            "timeout": 3,
+        },
+    },
+})
+```
+</CodeGroup>
+
+### Failover Configuration
+
+<ParamField path="failover.protocol" type="string" required>
+  Health check protocol: HTTP, TCP, UDP, ICMP
+</ParamField>
+
+<ParamField path="failover.port" type="integer" required>
+  Port to check (1-65535)
+</ParamField>
+
+<ParamField path="failover.frequency" type="integer" required>
+  Check frequency in seconds (10-3600)
+</ParamField>
+
+<ParamField path="failover.timeout" type="integer" required>
+  Timeout in seconds (1-10)
+</ParamField>
+
+<ParamField path="failover.method" type="string">
+  HTTP method (only for HTTP protocol)
+</ParamField>
+
+<ParamField path="failover.url" type="string">
+  URL path to check (only for HTTP protocol)
+</ParamField>
+
+<ParamField path="failover.tls" type="boolean">
+  Use HTTPS (only for HTTP protocol)
+</ParamField>
+
+<ParamField path="failover.host" type="string">
+  Host header (only for HTTP protocol)
+</ParamField>
+
+<ParamField path="failover.http_status_code" type="integer">
+  Expected HTTP status code (only for HTTP protocol)
+</ParamField>
+
+<ParamField path="failover.regexp" type="string">
+  Regular expression to match in response (non-ICMP protocols)
+</ParamField>
+
+<ParamField path="failover.command" type="string">
+  Bytes to send (only for TCP/UDP protocols)
+</ParamField>
+
+## List Records
+
+Retrieve all records in a zone.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+response, err := client.DNS.Zones.Rrsets.List(ctx, "example.com", dns.ZoneRrsetListParams{
+    Limit: gcore.F(int64(50)),
+    Offset: gcore.F(int64(0)),
+    OrderBy: gcore.F("name"),
+    OrderDirection: gcore.F(dns.ZoneRrsetListParamsOrderDirectionAsc),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Total records: %d\n", response.TotalAmount)
+for _, rrset := range response.Rrsets {
+    fmt.Printf("%s %s %d\n", rrset.Name, rrset.Type, rrset.Ttl)
+}
+```
+</CodeGroup>
+
+## Get Record
+
+Retrieve a specific DNS record.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+record, err := client.DNS.Zones.Rrsets.Get(ctx, "A", dns.ZoneRrsetGetParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("%s %s TTL=%d\n", record.Name, record.Type, record.Ttl)
+for _, rr := range record.ResourceRecords {
+    fmt.Printf("  Content: %v\n", rr.Content)
+}
+```
+</CodeGroup>
+
+## Update Record
+
+Update an existing DNS record. This replaces all resource records.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+record, err := client.DNS.Zones.Rrsets.Replace(ctx, "A", dns.ZoneRrsetReplaceParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Ttl: gcore.F(int64(1800)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetReplaceParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.10"},
+            Enabled: gcore.F(true),
+        },
+        {
+            Content: []any{"192.0.2.11"},
+            Enabled: gcore.F(true),
+        },
+    }),
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+</CodeGroup>
+
+## Delete Record
+
+Delete a DNS record from a zone.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+err := client.DNS.Zones.Rrsets.Delete(ctx, "A", dns.ZoneRrsetDeleteParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Record deleted successfully")
+```
+</CodeGroup>
+
+## Get Failover History
+
+Retrieve the failover event log for a record with health checks.
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+logs, err := client.DNS.Zones.Rrsets.GetFailoverLogs(ctx, "A", dns.ZoneRrsetGetFailoverLogsParams{
+    ZoneName: "example.com",
+    RrsetName: "www",
+    Limit: gcore.F(int64(100)),
+    Offset: gcore.F(int64(0)),
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Total events: %d\n", logs.TotalAmount)
+for _, event := range logs.Log {
+    timestamp := time.Unix(event.Time, 0)
+    fmt.Printf("%s: %s - %s\n", timestamp, event.Address, event.Action)
+}
+```
+
+```json Response
+{
+  "total_amount": 2,
+  "log": [
+    {
+      "time": 1709068637,
+      "address": "192.0.2.1",
+      "action": "disabled"
+    },
+    {
+      "time": 1709069237,
+      "address": "192.0.2.1",
+      "action": "enabled"
+    }
+  ]
+}
+```
+</CodeGroup>
+
+## Record Metadata Fields
+
+Use these metadata fields on individual resource records for advanced routing:
+
+<ParamField path="meta.asn" type="array">
+  Array of autonomous system numbers (e.g., `[1234, 5678]`)
+</ParamField>
+
+<ParamField path="meta.continents" type="array">
+  Array of continent codes: af, an, eu, as, na, sa, oc
+</ParamField>
+
+<ParamField path="meta.countries" type="array">
+  Array of ISO country codes (e.g., `["us", "ca", "mx"]`)
+</ParamField>
+
+<ParamField path="meta.regions" type="array">
+  Array of region codes (e.g., `["de-bw", "de-by"]`)
+</ParamField>
+
+<ParamField path="meta.ip" type="array">
+  Array of CIDR ranges (e.g., `["192.168.15.0/24", "2003:de:2016::/48"]`)
+</ParamField>
+
+<ParamField path="meta.latlong" type="array">
+  Coordinates as `[latitude, longitude]` (e.g., `[52.520008, 13.404954]`)
+</ParamField>
+
+<ParamField path="meta.weight" type="number" default={50}>
+  Weight for weighted_shuffle picker (0-100)
+</ParamField>
+
+<ParamField path="meta.default" type="boolean">
+  Mark as default/fallback record
+</ParamField>
+
+<ParamField path="meta.backup" type="boolean">
+  Mark as backup record for failover
+</ParamField>
+
+<ParamField path="meta.notes" type="string">
+  Human-readable notes about the record
+</ParamField>
+
+## Complete Example
+
+Complex geo-routed record with health checks and failover:
+
+<CodeGroup>
+```go Code
+ctx := context.Background()
+
+record, err := client.DNS.Zones.Rrsets.New(ctx, "A", dns.ZoneRrsetNewParams{
+    ZoneName: "example.com",
+    RrsetName: "api",
+    Ttl: gcore.F(int64(60)),
+    ResourceRecords: gcore.F([]dns.ZoneRrsetNewParamsResourceRecord{
+        {
+            Content: []any{"192.0.2.1"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "countries": []string{"us", "ca"},
+                "latlong": []float64{37.7749, -122.4194},
+                "weight": 70,
+                "notes": "US West primary",
+            },
+        },
+        {
+            Content: []any{"192.0.2.2"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "countries": []string{"us", "ca"},
+                "latlong": []float64{37.7749, -122.4194},
+                "weight": 30,
+                "notes": "US West secondary",
+            },
+        },
+        {
+            Content: []any{"192.0.2.3"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "countries": []string{"de", "fr", "gb"},
+                "latlong": []float64{51.5074, -0.1278},
+                "notes": "EU primary",
+            },
+        },
+        {
+            Content: []any{"192.0.2.4"},
+            Enabled: gcore.F(true),
+            Meta: map[string]any{
+                "default": true,
+                "backup": true,
+                "notes": "Global fallback",
+            },
+        },
+    }),
+    Pickers: gcore.F([]dns.ZoneRrsetNewParamsPicker{
+        {
+            Type: "geodns",
+            Strict: gcore.F(false),
+        },
+        {
+            Type: "geodistance",
+        },
+        {
+            Type: "weighted_shuffle",
+        },
+        {
+            Type: "first_n",
+            Limit: gcore.F(int64(2)),
+        },
+    }),
+    Meta: map[string]any{
+        "failover": map[string]any{
+            "protocol": "HTTPS",
+            "port": 443,
+            "frequency": 30,
+            "timeout": 5,
+            "method": "GET",
+            "url": "/health",
+            "tls": true,
+            "http_status_code": 200,
+        },
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created dynamic record: %s\n", record.Name)
+```
+</CodeGroup>
+
+This example:
+1. Filters by country (geodns)
+2. Sorts by distance to user (geodistance)
+3. Randomly distributes based on weights (weighted_shuffle)
+4. Returns 2 closest servers (first_n)
+5. Monitors health and automatically fails over unhealthy servers

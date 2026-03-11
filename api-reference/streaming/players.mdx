@@ -1,0 +1,436 @@
+---
+title: "Video Players"
+description: "Customize HTML5 video players with branding, controls, and behavior settings"
+---
+
+## Overview
+
+The Players service allows you to create customized HTML5 video player configurations with your own branding, colors, logos, and behavior settings. These players can be used with both live streams and video-on-demand content.
+
+## Player Object
+
+The Player object defines the appearance and behavior of the video player.
+
+<ResponseField name="id" type="int64">
+  Player ID
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Player name for identification
+</ResponseField>
+
+<ResponseField name="framework" type="string">
+  Player framework type (e.g., video.js, clappr)
+</ResponseField>
+
+<ResponseField name="autoplay" type="bool">
+  Video playback behavior:
+  - `true`: Video starts playing automatically on load
+  - `false`: User must click play (default)
+</ResponseField>
+
+<ResponseField name="mute" type="bool">
+  Sound volume on load:
+  - `true`: Video starts muted
+  - `false`: Video starts with volume on (default)
+</ResponseField>
+
+<ResponseField name="bg_color" type="string">
+  Skin background color in format `#AAAAAA`
+</ResponseField>
+
+<ResponseField name="fg_color" type="string">
+  Skin foreground color (UI elements) in format `#AAAAAA`
+</ResponseField>
+
+<ResponseField name="hover_color" type="string">
+  Color of elements when mouse hovers, in format `#AAAAAA`
+</ResponseField>
+
+<ResponseField name="text_color" type="string">
+  Text elements color in format `#AAAAAA`
+</ResponseField>
+
+<ResponseField name="logo" type="string">
+  URL to logo image displayed on player
+</ResponseField>
+
+<ResponseField name="logo_position" type="string">
+  Logo position on player:
+  - `tl`: Top left
+  - `tr`: Top right
+  - `bl`: Bottom left
+  - `br`: Bottom right
+</ResponseField>
+
+<ResponseField name="disable_skin" type="bool">
+  Player skin visibility:
+  - `true`: Skin is disabled (no controls visible)
+  - `false`: Skin is enabled (default)
+</ResponseField>
+
+<ResponseField name="show_sharing" type="bool">
+  Sharing button visibility:
+  - `true`: Sharing button is displayed (default)
+  - `false`: No sharing button
+</ResponseField>
+
+<ResponseField name="speed_control" type="bool">
+  Playback speed control button:
+  - `true`: Speed control button is displayed
+  - `false`: No speed control (default)
+</ResponseField>
+
+<ResponseField name="save_options_to_cookies" type="bool">
+  Persist user settings:
+  - `true`: Volume and options saved in cookies (default)
+  - `false`: Settings not saved
+</ResponseField>
+
+<ResponseField name="custom_css" type="string">
+  Custom CSS injected into player iframe
+</ResponseField>
+
+<ResponseField name="design" type="string">
+  Additional JavaScript parameters rendered to player
+</ResponseField>
+
+<ResponseField name="js_url" type="string">
+  Custom player JavaScript file URL. Leave empty to use default.
+</ResponseField>
+
+<ResponseField name="skin_is_url" type="string">
+  URL to custom skin JavaScript file
+</ResponseField>
+
+## Create Player
+
+Create a custom player configuration.
+
+```go player.go
+player, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:         "Branded Player",
+        Autoplay:     gcore.Bool(false),
+        Mute:         gcore.Bool(false),
+        BgColor:      gcore.String("#1a1a1a"),
+        FgColor:      gcore.String("#ff3366"),
+        HoverColor:   gcore.String("#ff6699"),
+        TextColor:    gcore.String("#ffffff"),
+        Logo:         gcore.String("https://example.com/logo.png"),
+        LogoPosition: gcore.String("tr"),
+        ShowSharing:  gcore.Bool(true),
+        SpeedControl: gcore.Bool(true),
+    },
+})
+```
+
+<ParamField path="player.name" type="string" required>
+  Player name
+</ParamField>
+
+<ParamField path="player.autoplay" type="bool">
+  Enable automatic playback. Default: false
+</ParamField>
+
+<ParamField path="player.mute" type="bool">
+  Start with volume muted. Default: false
+</ParamField>
+
+<ParamField path="player.bg_color" type="string">
+  Background color (e.g., `#1a1a1a`)
+</ParamField>
+
+<ParamField path="player.fg_color" type="string">
+  Foreground/UI elements color (e.g., `#ff3366`)
+</ParamField>
+
+<ParamField path="player.hover_color" type="string">
+  Hover state color (e.g., `#ff6699`)
+</ParamField>
+
+<ParamField path="player.text_color" type="string">
+  Text color (e.g., `#ffffff`)
+</ParamField>
+
+<ParamField path="player.logo" type="string">
+  Logo image URL
+</ParamField>
+
+<ParamField path="player.logo_position" type="string">
+  Logo position: `tl`, `tr`, `bl`, `br`
+</ParamField>
+
+<ParamField path="player.disable_skin" type="bool">
+  Disable player controls. Default: false
+</ParamField>
+
+<ParamField path="player.show_sharing" type="bool">
+  Show sharing button. Default: true
+</ParamField>
+
+<ParamField path="player.speed_control" type="bool">
+  Show speed control button. Default: false
+</ParamField>
+
+<ParamField path="player.save_options_to_cookies" type="bool">
+  Save user preferences. Default: true
+</ParamField>
+
+<ParamField path="player.custom_css" type="string">
+  Custom CSS styles
+</ParamField>
+
+<ParamField path="player.framework" type="string">
+  Player framework type
+</ParamField>
+
+## Update Player
+
+Update an existing player configuration.
+
+```go player.go
+player, err := client.Streaming.Players.Update(
+    context.TODO(),
+    playerID,
+    streaming.PlayerUpdateParams{
+        Player: streaming.PlayerParam{
+            Name:     "Updated Player Name",
+            BgColor:  gcore.String("#000000"),
+            Autoplay: gcore.Bool(true),
+        },
+    },
+)
+```
+
+## Get Player
+
+Retrieve player configuration details.
+
+```go player.go
+player, err := client.Streaming.Players.Get(context.TODO(), playerID)
+
+fmt.Printf("Player: %s\n", player.Name)
+fmt.Printf("Autoplay: %v\n", player.Autoplay)
+fmt.Printf("Colors: BG=%s, FG=%s\n", player.BgColor, player.FgColor)
+```
+
+## List Players
+
+Retrieve a paginated list of all players.
+
+```go player.go
+page, err := client.Streaming.Players.List(context.TODO(), streaming.PlayerListParams{
+    Page: gcore.Int64(1),
+})
+
+for _, player := range page.Items {
+    fmt.Printf("%d: %s\n", player.ID, player.Name)
+}
+
+// Auto-pagination
+autoPager := client.Streaming.Players.ListAutoPaging(context.TODO(), streaming.PlayerListParams{})
+for autoPager.Next() {
+    player := autoPager.Current()
+    fmt.Printf("%s\n", player.Name)
+}
+```
+
+## Delete Player
+
+Delete a player configuration.
+
+```go player.go
+err := client.Streaming.Players.Delete(context.TODO(), playerID)
+```
+
+<Warning>
+  Deleting a player that is in use by broadcasts or videos may cause them to fall back to the default player.
+</Warning>
+
+## Preview Player
+
+Get an HTML preview of the player configuration.
+
+```go player.go
+err := client.Streaming.Players.Preview(context.TODO(), playerID)
+```
+
+## Player Templates
+
+### Dark Theme Player
+
+```go player.go
+darkPlayer, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:         "Dark Theme",
+        BgColor:      gcore.String("#000000"),
+        FgColor:      gcore.String("#ffffff"),
+        HoverColor:   gcore.String("#cccccc"),
+        TextColor:    gcore.String("#ffffff"),
+        Autoplay:     gcore.Bool(false),
+        ShowSharing:  gcore.Bool(true),
+        SpeedControl: gcore.Bool(true),
+    },
+})
+```
+
+### Branded Corporate Player
+
+```go player.go
+corpPlayer, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:         "Corporate Branded",
+        BgColor:      gcore.String("#1a1a2e"),
+        FgColor:      gcore.String("#0f4c75"),
+        HoverColor:   gcore.String("#3282b8"),
+        TextColor:    gcore.String("#bbe1fa"),
+        Logo:         gcore.String("https://company.com/logo.png"),
+        LogoPosition: gcore.String("tr"),
+        Autoplay:     gcore.Bool(false),
+        Mute:         gcore.Bool(false),
+        ShowSharing:  gcore.Bool(true),
+    },
+})
+```
+
+### Minimal Player (No Controls)
+
+```go player.go
+minimalPlayer, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:        "Minimal",
+        DisableSkin: gcore.Bool(true),
+        Autoplay:    gcore.Bool(true),
+        Mute:        gcore.Bool(true),
+    },
+})
+```
+
+### Auto-Play Muted Player (Mobile-Friendly)
+
+```go player.go
+mobilePlayer, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:                 "Mobile Autoplay",
+        Autoplay:             gcore.Bool(true),
+        Mute:                 gcore.Bool(true),
+        SaveOptionsToCookies: gcore.Bool(true),
+        BgColor:              gcore.String("#1a1a1a"),
+        FgColor:              gcore.String("#ffffff"),
+    },
+})
+```
+
+### Educational Player with Speed Control
+
+```go player.go
+eduPlayer, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name:         "Educational",
+        SpeedControl: gcore.Bool(true),
+        ShowSharing:  gcore.Bool(false),
+        Autoplay:     gcore.Bool(false),
+        BgColor:      gcore.String("#2c3e50"),
+        FgColor:      gcore.String("#3498db"),
+        TextColor:    gcore.String("#ecf0f1"),
+    },
+})
+```
+
+## Custom CSS Examples
+
+### Hide Specific Controls
+
+```go player.go
+player, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name: "Custom Controls",
+        CustomCss: gcore.String(`
+            /* Hide volume control */
+            .vjs-volume-control { display: none !important; }
+            
+            /* Customize progress bar */
+            .vjs-progress-holder {
+                height: 8px !important;
+            }
+            
+            /* Round corners */
+            .video-js {
+                border-radius: 12px;
+                overflow: hidden;
+            }
+        `),
+    },
+})
+```
+
+### Custom Branding Overlay
+
+```go player.go
+player, err := client.Streaming.Players.New(context.TODO(), streaming.PlayerNewParams{
+    Player: streaming.PlayerParam{
+        Name: "Branded Overlay",
+        CustomCss: gcore.String(`
+            /* Add watermark */
+            .video-js::after {
+                content: 'Company Name';
+                position: absolute;
+                bottom: 60px;
+                right: 20px;
+                background: rgba(0, 0, 0, 0.7);
+                color: white;
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                z-index: 1;
+            }
+        `),
+    },
+})
+```
+
+## Using Players with Content
+
+### Assign Player to Broadcast
+
+```go player.go
+broadcast, err := client.Streaming.Broadcasts.New(context.TODO(), streaming.BroadcastNewParams{
+    Broadcast: streaming.BroadcastNewParamsBroadcast{
+        Name:      "Event with Custom Player",
+        StreamIDs: []int64{streamID},
+        PlayerID:  gcore.Int64(playerID),
+    },
+})
+```
+
+### Assign Player to Video
+
+Players can also be associated with individual videos (consult the Videos API for details).
+
+## Best Practices
+
+### Color Selection
+- Use high contrast between `bg_color` and `text_color` for readability
+- Test `hover_color` to ensure visibility on both light and dark backgrounds
+- Follow your brand guidelines for consistency
+
+### Autoplay Considerations
+- Mobile browsers often block autoplay with sound
+- Use `autoplay: true` with `mute: true` for reliable mobile autoplay
+- Consider user experience - not all users appreciate autoplay
+
+### Logo Placement
+- `tr` (top right) is most common for branding
+- Keep logos small to avoid obstructing content
+- Use transparent PNG format for best results
+
+### Performance
+- Minimize custom CSS complexity
+- Test player on multiple devices and browsers
+- Use `save_options_to_cookies` to remember user preferences
+
+### Accessibility
+- Ensure sufficient color contrast (WCAG AA: 4.5:1 minimum)
+- Don't disable controls unless necessary
+- Provide alternative access methods for key functions

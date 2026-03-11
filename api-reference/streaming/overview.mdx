@@ -1,0 +1,115 @@
+---
+title: "Streaming Service Overview"
+description: "Manage live streams, broadcasts, videos, and players with the Gcore Streaming API"
+---
+
+## Overview
+
+The Gcore Streaming Service provides a comprehensive platform for managing video streaming content, including:
+
+- **Live Streams**: Create and manage live video streams with low-latency delivery
+- **Broadcasts**: Combine multiple streams with advertising and custom player configuration
+- **Videos**: Upload, transcode, and deliver video-on-demand content
+- **Players**: Customize HTML5 video players with your branding
+
+## Service Structure
+
+The Streaming service is organized into several sub-services:
+
+```go
+type StreamingService struct {
+    Options     []option.RequestOption
+    AITasks     AITaskService
+    Broadcasts  BroadcastService
+    Directories DirectoryService
+    Players     PlayerService
+    QualitySets QualitySetService
+    Playlists   PlaylistService
+    Videos      VideoService
+    Streams     StreamService
+    Restreams   RestreamService
+    Statistics  StatisticService
+}
+```
+
+## Key Features
+
+### Low Latency Streaming
+All streams support low-latency delivery (±4 seconds) using Common Media Application Format (CMAF) technology, reducing traditional 30-50 second delays.
+
+### Multiple Input Protocols
+- **RTMP/RTMPS**: Standard streaming protocols
+- **SRT**: Low-latency protocol for unreliable networks
+- **WebRTC (WHIP)**: Browser-based streaming
+- **HLS Pull**: Pull streams from external servers
+
+### Output Formats
+- **HLS**: Both CMAF and MPEG-TS variants
+- **MPEG-DASH**: CMAF-based delivery
+- **MP4**: Direct download for VOD content
+
+### Advanced Features
+- **DVR**: Allow viewers to rewind live streams
+- **Recording**: Automatically save live streams as VOD
+- **Transcoding**: Multi-bitrate ABR ladder (SD to 8K HDR)
+- **HTML Overlays**: Real-time graphics on live streams
+- **AI Subtitles**: Automatic transcription and translation
+
+## Getting Started
+
+### Initialize the Service
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/streaming"
+)
+
+client := gcore.NewClient(
+    option.WithAPIKey("your-api-key"),
+)
+
+// Access streaming services
+streams := client.Streaming.Streams
+videos := client.Streaming.Videos
+players := client.Streaming.Players
+```
+
+### Create a Live Stream
+
+```go
+stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewParams{
+    Name:   "My Live Stream",
+    Active: gcore.Bool(true),
+})
+```
+
+### Upload a Video
+
+```go
+video, err := client.Streaming.Videos.New(context.TODO(), streaming.CreateVideoParam{
+    Name: "My Video",
+    OriginURL: gcore.String("https://example.com/video.mp4"),
+})
+```
+
+## Common Use Cases
+
+### Live Event Streaming
+Use the Streams service to broadcast live events with DVR functionality and automatic recording.
+
+### Video-on-Demand Platform
+Leverage the Videos service to build a complete VOD platform with transcoding, thumbnails, and multiple quality options.
+
+### Custom Video Portal
+Combine Broadcasts, Players, and Videos to create a fully branded video experience.
+
+### Low-Latency Sports Broadcasting
+Utilize CMAF-based delivery with HTML overlays for real-time graphics and scores.
+
+## Related Resources
+
+- [Streams Management](/api-reference/streaming/streams)
+- [Broadcasts](/api-reference/streaming/broadcasts)
+- [Players](/api-reference/streaming/players)
+- [Videos API](https://api.gcore.com/docs/streaming#tag/Videos)

@@ -1,0 +1,376 @@
+---
+title: 'Bucket Lifecycle Policies'
+description: 'Configure automatic object expiration for S3 buckets'
+---
+
+## Overview
+
+Lifecycle policies enable automatic deletion of objects in S3 buckets after a specified number of days. This helps:
+
+- **Reduce Storage Costs**: Automatically remove old or temporary files
+- **Meet Compliance**: Enforce data retention policies
+- **Manage Data**: Keep storage clean without manual intervention
+
+<Note>
+Lifecycle policies apply globally to all objects in the bucket, including existing and future objects.
+</Note>
+
+## Setting a Lifecycle Policy
+
+Configure automatic object expiration:
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/packages/param"
+    "github.com/G-Core/gcore-go/storage"
+)
+
+client := gcore.NewClient()
+
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(30)),
+}
+
+err := client.Storage.Buckets.Lifecycle.New(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+
+fmt.Println("Objects will expire after 30 days")
+```
+
+### Parameters
+
+<ParamField path="bucket_name" type="string" required>
+  Name of the bucket to configure
+</ParamField>
+
+<ParamField body="storage_id" type="int64" required>
+  ID of the S3 storage containing the bucket
+</ParamField>
+
+<ParamField body="expiration_days" type="int64">
+  Number of days after which objects will be automatically deleted. Must be a positive integer.
+</ParamField>
+
+## Common Expiration Periods
+
+Here are some typical use cases:
+
+### Temporary Files (7 days)
+
+```go
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(7)),
+}
+```
+
+Use for temporary uploads, cache files, or short-term data.
+
+### Monthly Rotation (30 days)
+
+```go
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(30)),
+}
+```
+
+Use for monthly reports, logs, or data that should be kept for one month.
+
+### Quarterly Retention (90 days)
+
+```go
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(90)),
+}
+```
+
+Use for quarterly archives or compliance data.
+
+### Annual Retention (365 days)
+
+```go
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(365)),
+}
+```
+
+Use for yearly backups or long-term storage.
+
+## Removing a Lifecycle Policy
+
+Disable automatic object expiration:
+
+```go
+params := storage.BucketLifecycleDeleteParams{
+    StorageID: storageID,
+}
+
+err := client.Storage.Buckets.Lifecycle.Delete(
+    context.Background(),
+    "my-bucket-name",
+    params,
+)
+if err != nil {
+    // Handle error
+}
+
+fmt.Println("Lifecycle policy removed - objects will not expire")
+```
+
+### Parameters
+
+<ParamField path="bucket_name" type="string" required>
+  Name of the bucket to update
+</ParamField>
+
+<ParamField body="storage_id" type="int64" required>
+  ID of the S3 storage containing the bucket
+</ParamField>
+
+## Checking Lifecycle Configuration
+
+View the current lifecycle policy:
+
+```go
+buckets, err := client.Storage.Buckets.List(
+    context.Background(),
+    storageID,
+    storage.BucketListParams{},
+)
+if err != nil {
+    // Handle error
+}
+
+for _, bucket := range buckets.Results {
+    if bucket.Lifecycle > 0 {
+        fmt.Printf("Bucket %s: expires after %d days\n",
+            bucket.Name, bucket.Lifecycle)
+    } else {
+        fmt.Printf("Bucket %s: no lifecycle policy\n", bucket.Name)
+    }
+}
+```
+
+## Complete Example
+
+Here's a complete example managing lifecycle policies:
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/packages/param"
+    "github.com/G-Core/gcore-go/storage"
+)
+
+func main() {
+    client := gcore.NewClient()
+    ctx := context.Background()
+    
+    var storageID int64 = 12345
+    bucketName := "my-bucket"
+    
+    // Create bucket
+    err := client.Storage.Buckets.New(
+        ctx,
+        bucketName,
+        storage.BucketNewParams{StorageID: storageID},
+    )
+    if err != nil {
+        log.Fatalf("Failed to create bucket: %v", err)
+    }
+    fmt.Printf("Created bucket: %s\n", bucketName)
+    
+    // Set lifecycle to 30 days
+    err = client.Storage.Buckets.Lifecycle.New(
+        ctx,
+        bucketName,
+        storage.BucketLifecycleNewParams{
+            StorageID:      storageID,
+            ExpirationDays: param.NewOpt(int64(30)),
+        },
+    )
+    if err != nil {
+        log.Fatalf("Failed to set lifecycle: %v", err)
+    }
+    fmt.Println("Set lifecycle policy: 30 days")
+    
+    // List buckets and show lifecycle
+    buckets, err := client.Storage.Buckets.List(
+        ctx,
+        storageID,
+        storage.BucketListParams{},
+    )
+    if err != nil {
+        log.Fatalf("Failed to list buckets: %v", err)
+    }
+    
+    for _, bucket := range buckets.Results {
+        if bucket.Lifecycle > 0 {
+            fmt.Printf("Bucket: %s (expires: %d days)\n",
+                bucket.Name, bucket.Lifecycle)
+        } else {
+            fmt.Printf("Bucket: %s (no expiration)\n", bucket.Name)
+        }
+    }
+    
+    // Update lifecycle to 90 days
+    err = client.Storage.Buckets.Lifecycle.New(
+        ctx,
+        bucketName,
+        storage.BucketLifecycleNewParams{
+            StorageID:      storageID,
+            ExpirationDays: param.NewOpt(int64(90)),
+        },
+    )
+    if err != nil {
+        log.Fatalf("Failed to update lifecycle: %v", err)
+    }
+    fmt.Println("Updated lifecycle policy: 90 days")
+    
+    // Remove lifecycle policy
+    err = client.Storage.Buckets.Lifecycle.Delete(
+        ctx,
+        bucketName,
+        storage.BucketLifecycleDeleteParams{StorageID: storageID},
+    )
+    if err != nil {
+        log.Fatalf("Failed to remove lifecycle: %v", err)
+    }
+    fmt.Println("Removed lifecycle policy")
+    
+    // Verify removal
+    buckets, err = client.Storage.Buckets.List(
+        ctx,
+        storageID,
+        storage.BucketListParams{},
+    )
+    if err != nil {
+        log.Fatalf("Failed to list buckets: %v", err)
+    }
+    
+    for _, bucket := range buckets.Results {
+        if bucket.Name == bucketName {
+            if bucket.Lifecycle == 0 {
+                fmt.Println("Confirmed: No lifecycle policy")
+            }
+        }
+    }
+}
+```
+
+## Use Cases
+
+### Temporary File Storage
+
+```go
+// For user uploads that should be processed and deleted
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(1)), // Delete after 1 day
+}
+```
+
+### Log Retention
+
+```go
+// Keep application logs for 90 days
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(90)),
+}
+```
+
+### Backup Rotation
+
+```go
+// Keep daily backups for 30 days
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(30)),
+}
+```
+
+### Compliance Data
+
+```go
+// Keep compliance records for 7 years
+params := storage.BucketLifecycleNewParams{
+    StorageID:      storageID,
+    ExpirationDays: param.NewOpt(int64(2555)), // ~7 years
+}
+```
+
+## Best Practices
+
+1. **Plan Retention Periods**: Determine data retention needs before setting policies
+2. **Test First**: Test lifecycle policies on non-production buckets
+3. **Document Policies**: Keep records of retention periods for compliance
+4. **Monitor Storage**: Track storage usage after implementing policies
+5. **Consider Costs**: Balance retention needs with storage costs
+6. **Backup Important Data**: Don't rely solely on lifecycle policies for backups
+
+## Important Notes
+
+<Warning>
+Once a lifecycle policy is set, objects will be automatically deleted after the specified period. This action cannot be undone.
+</Warning>
+
+<Note>
+- Lifecycle policies apply to all objects in the bucket (existing and new)
+- Object age is calculated from upload time
+- Deletion occurs automatically when objects reach expiration age
+- Removing the policy doesn't restore deleted objects
+- Setting a new expiration period replaces the previous policy
+</Note>
+
+## Limitations
+
+- Expiration days must be a positive integer
+- Only one expiration rule per bucket (global to all objects)
+- No support for partial expiration (specific prefixes or patterns)
+- No transition to different storage classes
+
+## Error Handling
+
+```go
+err := client.Storage.Buckets.Lifecycle.New(
+    context.Background(),
+    bucketName,
+    params,
+)
+if err != nil {
+    // Handle specific errors
+    if strings.Contains(err.Error(), "not found") {
+        log.Printf("Bucket %s not found", bucketName)
+    } else if strings.Contains(err.Error(), "invalid") {
+        log.Printf("Invalid expiration days value")
+    } else {
+        log.Printf("Failed to set lifecycle: %v", err)
+    }
+    return
+}
+```
+
+## See Also
+
+- [Bucket Management](/api-reference/storage/buckets)
+- [Storage Overview](/api-reference/storage/overview)
+- [Storage Credentials](/api-reference/storage/credentials)

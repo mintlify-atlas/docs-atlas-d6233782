@@ -1,0 +1,241 @@
+---
+title: "Security"
+description: "Manage DDoS protection profiles, templates, events, and BGP announcements"
+---
+
+## Overview
+
+The Security service provides comprehensive DDoS protection and security management capabilities for your infrastructure. It includes tools for creating and managing protection profiles, monitoring security events, and controlling BGP announcements.
+
+## Available Services
+
+The Security service is organized into four main sub-services:
+
+### Profiles
+
+Protection profiles enable and configure DDoS protection for your resources. Each profile is based on a template and includes customizable fields for protection policies.
+
+**Key Methods:**
+- `New()` - Create a new protection profile (protection is enabled automatically)
+- `List()` - Get all protection profiles for the current client
+- `Get()` - Retrieve a specific profile by ID
+- `Replace()` - Update an existing profile and its protection policies
+- `Recreate()` - Recreate a profile with a different template
+- `Delete()` - Delete a profile (protection is disabled automatically)
+
+**Usage Example:**
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/security"
+)
+
+client := gcore.NewClient()
+
+// Create a new protection profile
+profile, err := client.Security.Profiles.New(context.Background(), security.ProfileNewParams{
+    ProfileTemplate: gcore.Int64(123),
+    Site:            "ed-1",
+    Fields: []security.ProfileNewParamsField{
+        {
+            BaseField:  1,
+            FieldValue: "custom-value",
+        },
+    },
+})
+
+// List all profiles
+profiles, err := client.Security.Profiles.List(context.Background(), security.ProfileListParams{
+    Site: gcore.String("ed-1"),
+})
+
+// Get a specific profile
+profile, err := client.Security.Profiles.Get(context.Background(), 456)
+
+// Update a profile
+updated, err := client.Security.Profiles.Replace(context.Background(), 456, security.ProfileReplaceParams{
+    ProfileTemplate: gcore.Int64(123),
+    Fields: []security.ProfileReplaceParamsField{
+        {
+            BaseField:  1,
+            FieldValue: "updated-value",
+        },
+    },
+})
+
+// Delete a profile
+err = client.Security.Profiles.Delete(context.Background(), 456)
+```
+
+### Profile Templates
+
+Profile templates serve as blueprints for creating protection profiles. They define the available fields and validation rules for profiles.
+
+**Key Methods:**
+- `List()` - Get all available profile templates (includes common templates and client-specific templates)
+
+**Usage Example:**
+```go
+// List all available templates
+templates, err := client.Security.ProfileTemplates.List(context.Background())
+
+for _, template := range *templates {
+    fmt.Printf("Template: %s (ID: %d)\n", template.Name, template.ID)
+    for _, field := range template.Fields {
+        fmt.Printf("  Field: %s (%s)\n", field.Name, field.FieldType)
+    }
+}
+```
+
+### Events
+
+Event logs provide visibility into security events such as DDoS alerts and RTBH (Remotely Triggered Black Hole) alerts.
+
+**Key Methods:**
+- `List()` - Get paginated event logs with filtering options
+- `ListAutoPaging()` - Automatically handle pagination when iterating through events
+
+**Usage Example:**
+```go
+// List events with filtering
+events, err := client.Security.Events.List(context.Background(), security.EventListParams{
+    AlertType:           gcore.F(security.EventListParamsAlertTypeDDOSAlert),
+    TargetedIPAddresses: gcore.String("192.0.2.1"),
+    Limit:               gcore.Int64(50),
+    Ordering:            gcore.F(security.EventListParamsOrderingMinusAttackStartTime),
+})
+
+// Auto-paging through all events
+pager := client.Security.Events.ListAutoPaging(context.Background(), security.EventListParams{
+    DateFrom: security.F(security.EventListParamsDateFromUnion{
+        OfTime: gcore.Time(time.Now().AddDate(0, -1, 0)),
+    }),
+})
+
+for pager.Next() {
+    event := pager.Current()
+    fmt.Printf("Event: %s at %s\n", event.AlertType, event.AttackStartTime)
+}
+
+if err := pager.Err(); err != nil {
+    // Handle error
+}
+```
+
+### BGP Announces
+
+BGP announcement management allows you to control network prefix announcements for DDoS protection.
+
+**Key Methods:**
+- `List()` - List BGP announcements with filtering by site, origin, and announcement status
+- `Toggle()` - Enable or disable BGP announcements for specific IP networks
+
+**Usage Example:**
+```go
+// List BGP announcements
+announces, err := client.Security.BgpAnnounces.List(context.Background(), security.BgpAnnounceListParams{
+    Announced: gcore.Bool(true),
+    Site:      gcore.String("ed-1"),
+})
+
+for _, announce := range *announces {
+    fmt.Printf("Client %d: %d announced, %d not announced\n",
+        announce.ClientID,
+        len(announce.Announced),
+        len(announce.NotAnnounced))
+}
+
+// Enable BGP announcement for a network
+response, err := client.Security.BgpAnnounces.Toggle(context.Background(), security.BgpAnnounceToggleParams{
+    Announce: "192.0.2.0/24",
+    Enabled:  true,
+})
+
+// Disable BGP announcement
+response, err = client.Security.BgpAnnounces.Toggle(context.Background(), security.BgpAnnounceToggleParams{
+    Announce: "192.0.2.0/24",
+    Enabled:  false,
+})
+```
+
+## Data Types
+
+### ClientProfile
+
+Represents a DDoS protection profile with the following key fields:
+- `ID` - Profile identifier
+- `ProfileTemplate` - The template used to create this profile
+- `Site` - Region where the protection is deployed
+- `Fields` - Customizable protection policy fields
+- `Options` - Profile options (active status, BGP, pricing)
+- `Status` - Current protection status
+- `IPAddress` - Protected IP address (for Universal template)
+
+### ClientProfileTemplate
+
+Represents a profile template with:
+- `ID` - Template identifier
+- `Name` - Template name
+- `Version` - Template version (UUID)
+- `Fields` - Available fields and their validation rules
+- `Created` - Template creation timestamp
+
+### ClientView (Event)
+
+Represents a security event with:
+- `ID` - Event identifier
+- `AlertType` - Type of alert (ddos_alert or rtbh_alert)
+- `AttackStartTime` - When the attack began
+- `AttackPowerBps` - Attack power in bits per second
+- `AttackPowerPps` - Attack power in packets per second
+- `TargetedIPAddresses` - IPs targeted by the attack
+- `NumberOfIPInvolvedInAttack` - Number of attacking IPs
+
+### ClientAnnounce
+
+Represents BGP announcement status with:
+- `ClientID` - Client identifier
+- `Announced` - List of announced IP networks
+- `NotAnnounced` - List of networks not currently announced
+
+## Common Patterns
+
+### Creating a Protection Profile
+
+1. First, list available templates to find the appropriate one
+2. Review the template fields and their requirements
+3. Create the profile with the template ID and field values
+4. Protection is automatically enabled upon creation
+
+### Monitoring Security Events
+
+1. Use filtering parameters to narrow down events of interest
+2. Sort events by attack power or start time
+3. Use auto-paging for large result sets
+4. Filter by date range to focus on recent activity
+
+### Managing BGP Announcements
+
+1. List current announcements to see the status
+2. Use the Toggle method to enable/disable announcements
+3. Filter by site to manage region-specific announcements
+
+## API Endpoints
+
+- Profiles: `/security/iaas/v2/profiles`
+- Profile Templates: `/security/iaas/profile-templates`
+- Events: `/security/notifier/v1/event_logs`
+- BGP Announces: `/security/sifter/v2/protected_addresses/announces`
+
+## Error Handling
+
+All methods return errors that conform to the standard Go error interface. Check for errors after each API call:
+
+```go
+profile, err := client.Security.Profiles.Get(context.Background(), profileID)
+if err != nil {
+    // Handle error
+    log.Fatalf("Failed to get profile: %v", err)
+}
+```

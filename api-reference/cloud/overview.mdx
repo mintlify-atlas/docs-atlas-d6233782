@@ -1,0 +1,141 @@
+---
+title: 'Cloud Service Overview'
+description: 'Introduction to the Gcore Go SDK Cloud service for managing cloud infrastructure resources'
+---
+
+The Cloud service provides comprehensive methods for managing Gcore cloud infrastructure resources including virtual machines, networks, storage volumes, load balancers, and Kubernetes clusters.
+
+## Getting Started
+
+The Cloud service is accessed through the main Gcore client:
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithAPIKey("your-api-key"),
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+// Access cloud resources
+instances := client.Cloud.Instances
+networks := client.Cloud.Networks
+volumes := client.Cloud.Volumes
+```
+
+## Available Resources
+
+The Cloud service provides access to the following resource types:
+
+### Compute Resources
+- **[Projects](/api-reference/cloud/projects)** - Organizational units for grouping resources
+- **[Instances](/api-reference/cloud/instances)** - Virtual machine instances
+- **[Baremetal](/api-reference/cloud/baremetal)** - Bare metal servers
+
+### Storage Resources
+- **[Volumes](/api-reference/cloud/volumes)** - Block storage volumes
+- **Volume Snapshots** - Point-in-time volume backups
+
+### Networking Resources
+- **[Networks](/api-reference/cloud/networks)** - Virtual networks and subnets
+- **[Security Groups](/api-reference/cloud/security-groups)** - Firewall rules
+- **[Load Balancers](/api-reference/cloud/loadbalancers)** - Traffic distribution
+- **Floating IPs** - Static public IP addresses
+- **Reserved Fixed IPs** - Reserved private IP addresses
+
+### Container Orchestration
+- **[Kubernetes](/api-reference/cloud/kubernetes)** - Managed Kubernetes clusters
+
+### Other Services
+- **Tasks** - Asynchronous operation tracking
+- **Regions** - Available data center locations
+- **Quotas** - Resource limits and usage
+- **SSH Keys** - SSH key pair management
+- **Secrets** - Encrypted credential storage
+
+## Common Patterns
+
+### Using Project and Region Context
+
+Most cloud operations require a project ID and region ID. You can set these globally:
+
+```go
+client := gcore.NewClient(
+    option.WithCloudProjectID(123),
+    option.WithCloudRegionID(456),
+)
+
+// These will use the default project and region
+instances, _ := client.Cloud.Instances.List(context.Background(), cloud.InstanceListParams{})
+```
+
+Or specify them per-request:
+
+```go
+instances, _ := client.Cloud.Instances.List(context.Background(), 
+    cloud.InstanceListParams{
+        ProjectID: gcore.Int(123),
+        RegionID: gcore.Int(456),
+    },
+)
+```
+
+### Polling for Async Operations
+
+Many cloud operations are asynchronous and return task IDs. Use the `*AndPoll` methods for convenience:
+
+```go
+// Create and wait for completion
+instance, err := client.Cloud.Instances.NewAndPoll(context.Background(), params)
+
+// Delete and wait for completion
+err = client.Cloud.Instances.DeleteAndPoll(context.Background(), instanceID, params)
+```
+
+### Pagination
+
+Use auto-paging iterators for large result sets:
+
+```go
+iter := client.Cloud.Instances.ListAutoPaging(context.Background(), 
+    cloud.InstanceListParams{
+        Limit: gcore.Int(100),
+    },
+)
+
+for iter.Next() {
+    instance := iter.Current()
+    fmt.Printf("Instance: %s\n", instance.Name)
+}
+
+if err := iter.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+### Error Handling
+
+All methods return Go errors that can be inspected:
+
+```go
+instance, err := client.Cloud.Instances.Get(ctx, instanceID, params)
+if err != nil {
+    // Handle error
+    log.Printf("Failed to get instance: %v", err)
+    return err
+}
+```
+
+## Next Steps
+
+Explore specific resource types:
+- Start with [Projects](/api-reference/cloud/projects) to organize your resources
+- Create [Instances](/api-reference/cloud/instances) for compute workloads
+- Set up [Networks](/api-reference/cloud/networks) for connectivity
+- Attach [Volumes](/api-reference/cloud/volumes) for persistent storage
+- Deploy [Kubernetes](/api-reference/cloud/kubernetes) clusters for containerized applications

@@ -1,0 +1,232 @@
+---
+title: API Reference Overview
+description: Comprehensive guide to the Gcore Go SDK API services and packages
+---
+
+## Introduction
+
+The Gcore Go SDK provides convenient access to the [Gcore REST API](https://api.gcore.com/docs) through a collection of service-oriented packages. Each service package corresponds to a major Gcore product or functionality area, providing type-safe methods for interacting with the API.
+
+The SDK is built with [Stainless](https://www.stainless.com/) and follows modern Go patterns including:
+- Type-safe request/response structures
+- Automatic pagination support
+- Built-in error handling and retries
+- Contextual timeouts and cancellation
+- Request middleware support
+
+## Getting Started
+
+Initialize a client to access all available services:
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("My API Key"), // defaults to os.LookupEnv("GCORE_API_KEY")
+    )
+    
+    // Access services via the client
+    projects, err := client.Cloud.Projects.List(context.TODO())
+    if err != nil {
+        panic(err)
+    }
+}
+```
+
+## Available Services
+
+The Gcore Go SDK provides nine primary service packages, each accessible through the main client:
+
+### Service Access Pattern
+
+All services follow a consistent access pattern through the main client:
+
+```go
+client := gcore.NewClient()
+
+// Access services via client properties
+client.Cloud      // Cloud infrastructure services
+client.CDN        // Content Delivery Network services
+client.DNS        // Domain Name System services
+client.Storage    // Object storage services
+client.Streaming  // Video streaming services
+client.Iam        // Identity and Access Management
+client.Waap       // Web Application and API Protection
+client.Security   // Security and DDoS protection
+client.Fastedge   // Edge computing platform
+```
+
+### Service Structure
+
+Each service contains:
+- **Top-level methods** for direct operations on the service
+- **Sub-services** for related functionality (e.g., `client.Cloud.Projects`, `client.CDN.CDNResources`)
+- **Consistent patterns** for CRUD operations, listing, and pagination
+
+## Common Patterns
+
+### Making Requests
+
+All service methods follow these patterns:
+
+```go
+// Create operation
+resource, err := client.Service.SubService.New(ctx, params)
+
+// Read operation
+resource, err := client.Service.SubService.Get(ctx, id)
+
+// Update operation
+resource, err := client.Service.SubService.Update(ctx, id, params)
+
+// Delete operation
+err := client.Service.SubService.Delete(ctx, id)
+
+// List operation with pagination
+page, err := client.Service.SubService.List(ctx, params)
+```
+
+### Auto-Pagination
+
+The SDK provides automatic pagination for list endpoints:
+
+```go
+iter := client.Cloud.Projects.ListAutoPaging(context.TODO(), cloud.ProjectListParams{
+    Limit: gcore.Int(10),
+})
+for iter.Next() {
+    project := iter.Current()
+    fmt.Printf("%+v\n", project)
+}
+if err := iter.Err(); err != nil {
+    panic(err.Error())
+}
+```
+
+### Error Handling
+
+Handle API errors using Go's standard error patterns:
+
+```go
+_, err := client.Cloud.Projects.Get(context.TODO(), projectID)
+if err != nil {
+    var apierr *gcore.Error
+    if errors.As(err, &apierr) {
+        println(apierr.StatusCode)
+        println(string(apierr.DumpResponse(true)))
+    }
+    panic(err.Error())
+}
+```
+
+### Request Options
+
+Customize requests with functional options:
+
+```go
+client.Cloud.Projects.New(
+    context.TODO(),
+    params,
+    option.WithHeader("X-Custom-Header", "value"),
+    option.WithMaxRetries(5),
+    option.WithRequestTimeout(30*time.Second),
+)
+```
+
+## Service Documentation
+
+Explore detailed documentation for each service:
+
+<CardGroup cols={3}>
+  <Card title="Cloud" icon="cloud" href="/api-reference/cloud/overview">
+    Cloud infrastructure including VMs, networks, load balancers, and storage volumes
+  </Card>
+  
+  <Card title="CDN" icon="globe" href="/api-reference/cdn/overview">
+    Content delivery network resources, origins, certificates, and caching rules
+  </Card>
+  
+  <Card title="DNS" icon="network-wired" href="/api-reference/dns/overview">
+    DNS zones, records, DNSSEC, and authoritative name services
+  </Card>
+  
+  <Card title="Storage" icon="database" href="/api-reference/storage/overview">
+    S3-compatible object storage with buckets and credentials management
+  </Card>
+  
+  <Card title="Streaming" icon="video" href="/api-reference/streaming/overview">
+    Video streaming, transcoding, broadcasts, and media management
+  </Card>
+  
+  <Card title="IAM" icon="key" href="/api-reference/iam/overview">
+    Identity and access management with API tokens and user authentication
+  </Card>
+  
+  <Card title="WAAP" icon="shield-halved" href="/api-reference/waap/overview">
+    Web application and API protection against security threats
+  </Card>
+  
+  <Card title="Security" icon="shield" href="/api-reference/security/overview">
+    DDoS protection, security profiles, and BGP announcements
+  </Card>
+  
+  <Card title="Fastedge" icon="bolt" href="/api-reference/fastedge/overview">
+    Edge computing with WebAssembly apps and key-value storage
+  </Card>
+</CardGroup>
+
+## Advanced Usage
+
+### Custom Requests
+
+Make requests to undocumented endpoints:
+
+```go
+var result map[string]any
+err := client.Post(context.Background(), "/custom/endpoint", params, &result)
+```
+
+### Middleware
+
+Add custom middleware for logging or monitoring:
+
+```go
+func Logger(req *http.Request, next option.MiddlewareNext) (*http.Response, error) {
+    start := time.Now()
+    res, err := next(req)
+    fmt.Printf("Request took %v\n", time.Since(start))
+    return res, err
+}
+
+client := gcore.NewClient(
+    option.WithMiddleware(Logger),
+)
+```
+
+### Raw Response Access
+
+Access response headers and metadata:
+
+```go
+var response *http.Response
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    params,
+    option.WithResponseInto(&response),
+)
+fmt.Printf("Status: %d\n", response.StatusCode)
+```
+
+## Next Steps
+
+- Explore individual service documentation using the cards above
+- Review the [complete API reference](https://pkg.go.dev/github.com/G-Core/gcore-go)
+- Check out [examples](https://github.com/G-Core/gcore-go/tree/main/examples) in the repository
+- Read about [authentication and configuration](/getting-started/authentication)

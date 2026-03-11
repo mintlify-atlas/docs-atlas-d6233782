@@ -1,0 +1,552 @@
+---
+title: 'Apps'
+description: 'Manage FastEdge applications that combine WebAssembly binaries with configuration'
+---
+
+## Overview
+
+FastEdge applications combine a WebAssembly binary with configuration, environment variables, and secrets for deployment at the CDN edge. Apps can be in various states (draft, enabled, disabled) and support debugging, logging, and custom response headers.
+
+## Create App
+
+Add a new FastEdge application.
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/fastedge"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("your-api-key"),
+    )
+    
+    app, err := client.Fastedge.Apps.New(context.Background(), fastedge.AppNewParams{
+        App: fastedge.AppParam{
+            Name:     gcore.String("my-edge-app"),
+            Binary:   gcore.Int(12345),
+            Comment:  gcore.String("My FastEdge application"),
+            Status:   gcore.Int(1),
+            Template: gcore.Int(1),
+            Debug:    gcore.Bool(false),
+            Log:      fastedge.AppLogKafka,
+            Env: map[string]string{
+                "API_ENDPOINT": "https://api.example.com",
+                "CACHE_TTL":    "3600",
+            },
+            RspHeaders: map[string]string{
+                "X-Custom-Header": "value",
+            },
+            Secrets: map[string]fastedge.AppSecretParam{
+                "api_key": {
+                    ID: 123,
+                },
+            },
+            Stores: map[string]fastedge.AppStoreParam{
+                "cache": {
+                    ID: 456,
+                },
+            },
+        },
+    })
+    
+    if err != nil {
+        panic(err)
+    }
+    
+    fmt.Printf("Created app ID: %d\n", app.ID)
+    fmt.Printf("App URL: %s\n", app.URL)
+}
+```
+
+### Parameters
+
+<ParamField body="name" type="string">
+  Application name
+</ParamField>
+
+<ParamField body="binary" type="int64">
+  Binary ID - references a WebAssembly binary to use
+</ParamField>
+
+<ParamField body="comment" type="string">
+  Application description or comment
+</ParamField>
+
+<ParamField body="status" type="int64">
+  Status code:
+  - `0` - draft (inactive)
+  - `1` - enabled
+  - `2` - disabled
+</ParamField>
+
+<ParamField body="template" type="int64">
+  Template ID to use for the application
+</ParamField>
+
+<ParamField body="debug" type="bool">
+  Switch on logging for 30 minutes (switched off by default)
+</ParamField>
+
+<ParamField body="log" type="string">
+  Logging channel. Options: `kafka` (default, allows exploring logs with API), `none`
+</ParamField>
+
+<ParamField body="env" type="map[string]string">
+  Environment variables as key-value pairs
+</ParamField>
+
+<ParamField body="rsp_headers" type="map[string]string">
+  Extra headers to add to responses
+</ParamField>
+
+<ParamField body="secrets" type="map[string]AppSecretParam">
+  Application secrets mapping. Each entry contains:
+  - `id` (int64, required) - The unique identifier of the secret
+</ParamField>
+
+<ParamField body="stores" type="map[string]AppStoreParam">
+  Application edge stores mapping. Each entry contains:
+  - `id` (int64, required) - The identifier of the store
+</ParamField>
+
+### Response
+
+Returns an `AppShort` object with the created application details.
+
+<ResponseField name="id" type="int64" required>
+  Application ID
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Application name
+</ResponseField>
+
+<ResponseField name="binary" type="int64" required>
+  Binary ID
+</ResponseField>
+
+<ResponseField name="status" type="int64" required>
+  Application status code
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  Application URL for accessing the edge app
+</ResponseField>
+
+<ResponseField name="api_type" type="string" required>
+  WebAssembly API type
+</ResponseField>
+
+<ResponseField name="plan_id" type="int64" required>
+  Application plan ID
+</ResponseField>
+
+<ResponseField name="plan" type="string">
+  Application plan name
+</ResponseField>
+
+<ResponseField name="comment" type="string">
+  Description of the application
+</ResponseField>
+
+<ResponseField name="debug" type="bool">
+  Whether debug mode is enabled
+</ResponseField>
+
+<ResponseField name="debug_until" type="time.Time">
+  When debugging finishes (ISO 8601 format)
+</ResponseField>
+
+<ResponseField name="networks" type="[]string">
+  List of networks the app is deployed to
+</ResponseField>
+
+<ResponseField name="template" type="int64">
+  Template ID
+</ResponseField>
+
+<ResponseField name="template_name" type="string">
+  Template name
+</ResponseField>
+
+<ResponseField name="upgradeable_to" type="int64">
+  ID of the binary the app can be upgraded to
+</ResponseField>
+
+## Get App Details
+
+Retrieve detailed information about a specific application.
+
+```go
+app, err := client.Fastedge.Apps.Get(context.Background(), 12345)
+if err != nil {
+    panic(err)
+}
+
+fmt.Printf("App Name: %s\n", app.Name)
+fmt.Printf("Binary: %d\n", app.Binary)
+fmt.Printf("Status: %d\n", app.Status)
+fmt.Printf("URL: %s\n", app.URL)
+```
+
+### Parameters
+
+<ParamField path="id" type="int64" required>
+  The application ID
+</ParamField>
+
+### Response
+
+Returns a full `App` object with all configuration details including environment variables, secrets, stores, and headers.
+
+<ResponseField name="name" type="string">
+  Application name
+</ResponseField>
+
+<ResponseField name="binary" type="int64">
+  Binary ID
+</ResponseField>
+
+<ResponseField name="api_type" type="string">
+  WebAssembly API type
+</ResponseField>
+
+<ResponseField name="status" type="int64">
+  Status code
+</ResponseField>
+
+<ResponseField name="comment" type="string">
+  Application description
+</ResponseField>
+
+<ResponseField name="debug" type="bool">
+  Debug mode status
+</ResponseField>
+
+<ResponseField name="debug_until" type="time.Time">
+  Debug expiration timestamp
+</ResponseField>
+
+<ResponseField name="log" type="string">
+  Logging channel (`kafka` or `none`)
+</ResponseField>
+
+<ResponseField name="env" type="map[string]string">
+  Environment variables
+</ResponseField>
+
+<ResponseField name="rsp_headers" type="map[string]string">
+  Custom response headers
+</ResponseField>
+
+<ResponseField name="secrets" type="map[string]AppSecret">
+  Application secrets with details
+  
+  <Expandable title="AppSecret Object">
+    <ResponseField name="id" type="int64" required>
+      Secret ID
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Secret name
+    </ResponseField>
+    
+    <ResponseField name="comment" type="string">
+      Secret description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="stores" type="map[string]AppStore">
+  Application edge stores with details
+  
+  <Expandable title="AppStore Object">
+    <ResponseField name="id" type="int64" required>
+      Store ID
+    </ResponseField>
+    
+    <ResponseField name="name" type="string">
+      Store name
+    </ResponseField>
+    
+    <ResponseField name="comment" type="string">
+      Store description
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="plan" type="string">
+  Plan name
+</ResponseField>
+
+<ResponseField name="plan_id" type="int64">
+  Plan ID
+</ResponseField>
+
+<ResponseField name="template" type="int64">
+  Template ID
+</ResponseField>
+
+<ResponseField name="template_name" type="string">
+  Template name
+</ResponseField>
+
+<ResponseField name="url" type="string">
+  Application URL
+</ResponseField>
+
+<ResponseField name="networks" type="[]string">
+  Deployed networks
+</ResponseField>
+
+## List Apps
+
+List all applications for the client with optional filtering and pagination.
+
+```go
+// List all apps
+apps, err := client.Fastedge.Apps.List(context.Background(), fastedge.AppListParams{})
+if err != nil {
+    panic(err)
+}
+
+for _, app := range apps.Apps {
+    fmt.Printf("App: %s (ID: %d)\n", app.Name, app.ID)
+}
+
+// List with filters
+apps, err = client.Fastedge.Apps.List(context.Background(), fastedge.AppListParams{
+    Status:   gcore.Int(1), // Only enabled apps
+    Binary:   gcore.Int(12345),
+    APIType:  fastedge.AppListParamsAPITypeWasiHTTP,
+    Limit:    gcore.Int(50),
+    Offset:   gcore.Int(0),
+    Ordering: fastedge.AppListParamsOrderingName,
+})
+```
+
+### Query Parameters
+
+<ParamField query="name" type="string">
+  Filter by application name
+</ParamField>
+
+<ParamField query="status" type="int64">
+  Filter by status code (0-5)
+</ParamField>
+
+<ParamField query="binary" type="int64">
+  Filter by binary ID
+</ParamField>
+
+<ParamField query="template" type="int64">
+  Filter by template ID
+</ParamField>
+
+<ParamField query="plan" type="int64">
+  Filter by plan ID
+</ParamField>
+
+<ParamField query="api_type" type="string">
+  Filter by API type:
+  - `wasi-http` - WASI with HTTP entry point
+  - `proxy-wasm` - Proxy-Wasm app, callable from CDN
+</ParamField>
+
+<ParamField query="limit" type="int64">
+  Maximum number of results (pagination)
+</ParamField>
+
+<ParamField query="offset" type="int64">
+  Offset for pagination
+</ParamField>
+
+<ParamField query="ordering" type="string">
+  Sort order. Options: `name`, `-name`, `status`, `-status`, `id`, `-id`, `template`, `-template`, `binary`, `-binary`, `plan`, `-plan`
+  
+  Use `-` prefix for descending order
+</ParamField>
+
+### Response
+
+Returns a paginated list of `AppShort` objects.
+
+### Auto-Paging
+
+For convenience, you can use `ListAutoPaging` to automatically iterate through all pages:
+
+```go
+pager := client.Fastedge.Apps.ListAutoPaging(context.Background(), fastedge.AppListParams{
+    Status: gcore.Int(1),
+})
+
+for pager.Next() {
+    app := pager.Current()
+    fmt.Printf("App: %s\n", app.Name)
+}
+
+if err := pager.Err(); err != nil {
+    panic(err)
+}
+```
+
+## Update App
+
+Partially update an existing application (PATCH).
+
+```go
+app, err := client.Fastedge.Apps.Update(
+    context.Background(),
+    12345, // app ID
+    fastedge.AppUpdateParams{
+        App: fastedge.AppParam{
+            Status:  gcore.Int(1), // Enable the app
+            Debug:   gcore.Bool(true),
+            Comment: gcore.String("Updated description"),
+            Env: map[string]string{
+                "NEW_VAR": "new_value",
+            },
+        },
+    },
+)
+```
+
+### Parameters
+
+<ParamField path="id" type="int64" required>
+  The application ID
+</ParamField>
+
+<ParamField body="app" type="AppParam">
+  Application fields to update. Only provided fields will be updated (partial update).
+  Accepts the same parameters as the Create App endpoint.
+</ParamField>
+
+### Response
+
+Returns the updated `AppShort` object.
+
+## Replace App
+
+Fully replace an application's configuration (PUT).
+
+```go
+app, err := client.Fastedge.Apps.Replace(
+    context.Background(),
+    12345, // app ID
+    fastedge.AppReplaceParams{
+        Body: fastedge.AppReplaceParamsBody{
+            AppParam: fastedge.AppParam{
+                Name:     gcore.String("my-app"),
+                Binary:   gcore.Int(67890),
+                Status:   gcore.Int(1),
+                Template: gcore.Int(1),
+                // All required fields must be provided
+            },
+        },
+    },
+)
+```
+
+### Parameters
+
+<ParamField path="id" type="int64" required>
+  The application ID
+</ParamField>
+
+<ParamField body="app" type="AppParam" required>
+  Complete application configuration. All fields should be provided for a full replacement.
+</ParamField>
+
+### Response
+
+Returns the replaced `AppShort` object.
+
+## Delete App
+
+Delete an application permanently.
+
+```go
+err := client.Fastedge.Apps.Delete(context.Background(), 12345)
+if err != nil {
+    panic(err)
+}
+
+fmt.Println("App deleted successfully")
+```
+
+### Parameters
+
+<ParamField path="id" type="int64" required>
+  The application ID to delete
+</ParamField>
+
+### Response
+
+Returns `nil` on success, or an error if the deletion fails.
+
+## Application Logs
+
+Access application logs through the `Logs` sub-service. See the [App Logs documentation](/api-reference/fastedge/app-logs) for details.
+
+```go
+// Access logs for an app
+logs := client.Fastedge.Apps.Logs
+```
+
+## API Types
+
+FastEdge supports two WebAssembly API types:
+
+### WASI-HTTP
+
+WASI with HTTP entry point - suitable for applications that need to handle HTTP requests directly.
+
+### Proxy-Wasm
+
+Proxy-Wasm applications that can be called from the CDN layer, allowing integration with CDN features.
+
+## Best Practices
+
+<Tip>
+  **Development Workflow**: Start with status `0` (draft) while developing, enable debug mode during testing, then set status to `1` (enabled) for production.
+</Tip>
+
+<Warning>
+  Debug mode automatically switches off after 30 minutes to prevent excessive log accumulation.
+</Warning>
+
+<Note>
+  Environment variables and secrets are distinct - use secrets for sensitive values like API keys that should be stored securely.
+</Note>
+
+## Error Handling
+
+```go
+app, err := client.Fastedge.Apps.Get(context.Background(), 12345)
+if err != nil {
+    var apiErr *gcore.Error
+    if errors.As(err, &apiErr) {
+        // Handle API error
+        fmt.Printf("API Error: %s\n", apiErr.Error())
+        // Access raw request/response for debugging
+        fmt.Println(string(apiErr.DumpRequest(true)))
+    }
+    return
+}
+```
+
+## Related Resources
+
+- [Binaries Documentation](/api-reference/fastedge/binaries)
+- [Secrets Documentation](/api-reference/fastedge/secrets)
+- [KV Stores Documentation](/api-reference/fastedge/kvstores)
+- [Templates Documentation](/api-reference/fastedge/templates)
+- [App Logs Documentation](/api-reference/fastedge/app-logs)

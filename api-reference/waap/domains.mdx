@@ -1,0 +1,444 @@
+---
+title: "Protected Domains"
+description: "Manage WAAP-protected domains with monitoring and security configurations"
+---
+
+## Overview
+
+WAAP domains enable Web Application and API Protection for monitoring and defending web applications against security threats. Each domain functions autonomously with its own set of rules and configurations.
+
+## Domain Service Structure
+
+The Domain service includes:
+
+- **Policies** - Security policy management
+- **Settings** - Domain-level configuration
+- **APIPaths** - API endpoint protection
+- **APIPathGroups** - Group API paths for bulk operations
+- **APIDiscovery** - Automatic API endpoint discovery
+- **Insights** - Security insights and recommendations
+- **InsightSilences** - Manage silenced security insights
+- **Statistics** - Domain-level security statistics
+- **CustomRules** - Domain-specific custom rules
+- **FirewallRules** - Network firewall rules
+- **AdvancedRules** - CEL-based advanced rules
+
+## List
+
+Retrieve a list of domains associated with your account.
+
+### Method
+
+```go
+func (r *DomainService) List(
+    ctx context.Context,
+    query DomainListParams,
+    opts ...option.RequestOption,
+) (*pagination.OffsetPage[WaapSummaryDomain], error)
+```
+
+### Parameters
+
+<ParamField query="limit" type="int64">
+  Number of items to return (pagination)
+</ParamField>
+
+<ParamField query="offset" type="int64">
+  Number of items to skip (pagination)
+</ParamField>
+
+<ParamField query="name" type="string">
+  Filter domains by name. Supports '*' as a wildcard character
+</ParamField>
+
+<ParamField query="ids" type="[]int64">
+  Filter domains by their IDs
+</ParamField>
+
+<ParamField query="status" type="string">
+  Filter domains by status
+  
+  Available values: `active`, `bypass`, `monitor`, `locked`
+</ParamField>
+
+<ParamField query="ordering" type="string">
+  Sort the response by the given field
+  
+  Available values: `id`, `name`, `status`, `created_at`, `-id`, `-name`, `-status`, `-created_at`
+  
+  Prefix with `-` for descending order
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="int64" required>
+  The domain ID
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The domain name
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  The domain status: `active`, `bypass`, `monitor`, or `locked`
+</ResponseField>
+
+<ResponseField name="created_at" type="time.Time" required>
+  The date and time the domain was created in ISO 8601 format
+</ResponseField>
+
+<ResponseField name="custom_page_set" type="int64" required>
+  The ID of the custom page set used for this domain
+</ResponseField>
+
+### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/waap"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    // List all active domains
+    domains, err := client.Waap.Domains.List(context.Background(), waap.DomainListParams{
+        Status: waap.DomainListParamsStatusActive,
+        Limit:  param.Opt(int64(50)),
+    })
+    if err != nil {
+        log.Fatalf("Failed to list domains: %v", err)
+    }
+    
+    for _, domain := range domains.Data {
+        fmt.Printf("Domain: %s (ID: %d, Status: %s)\n",
+            domain.Name, domain.ID, domain.Status)
+    }
+    
+    // Auto-pagination example
+    iter := client.Waap.Domains.ListAutoPaging(context.Background(), waap.DomainListParams{})
+    for iter.Next() {
+        domain := iter.Current()
+        fmt.Printf("Domain: %s\n", domain.Name)
+    }
+    if err := iter.Err(); err != nil {
+        log.Fatalf("Error during pagination: %v", err)
+    }
+}
+```
+
+## Get
+
+Retrieve detailed information about a specific domain.
+
+### Method
+
+```go
+func (r *DomainService) Get(
+    ctx context.Context,
+    domainID int64,
+    opts ...option.RequestOption,
+) (*WaapDetailedDomain, error)
+```
+
+### Parameters
+
+<ParamField path="domainID" type="int64" required>
+  The domain ID
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="int64" required>
+  The domain ID
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The domain name
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  The domain status: `active`, `bypass`, `monitor`, or `locked`
+</ResponseField>
+
+<ResponseField name="created_at" type="time.Time" required>
+  The date and time the domain was created
+</ResponseField>
+
+<ResponseField name="custom_page_set" type="int64" required>
+  The ID of the custom page set
+</ResponseField>
+
+<ResponseField name="quotas" type="map[string]Quota">
+  Domain-level resource quotas
+  
+  <ResponseField name="allowed" type="int64">
+    The maximum allowed number of this resource
+  </ResponseField>
+  
+  <ResponseField name="current" type="int64">
+    The current number of this resource
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+```go
+domainID := int64(12345)
+domain, err := client.Waap.Domains.Get(context.Background(), domainID)
+if err != nil {
+    log.Fatalf("Failed to get domain: %v", err)
+}
+
+fmt.Printf("Domain: %s\n", domain.Name)
+fmt.Printf("Status: %s\n", domain.Status)
+fmt.Printf("Created: %s\n", domain.CreatedAt)
+
+if domain.Quotas != nil {
+    for resource, quota := range domain.Quotas {
+        fmt.Printf("%s quota: %d/%d\n", resource, quota.Current, quota.Allowed)
+    }
+}
+```
+
+## Update
+
+Update a domain's configuration.
+
+### Method
+
+```go
+func (r *DomainService) Update(
+    ctx context.Context,
+    domainID int64,
+    body DomainUpdateParams,
+    opts ...option.RequestOption,
+) error
+```
+
+### Parameters
+
+<ParamField path="domainID" type="int64" required>
+  The domain ID
+</ParamField>
+
+<ParamField body="status" type="string" required>
+  The new status for the domain
+  
+  Available values: `active`, `monitor`
+</ParamField>
+
+### Example
+
+```go
+// Change domain status to monitor mode
+err := client.Waap.Domains.Update(
+    context.Background(),
+    12345,
+    waap.DomainUpdateParams{
+        Status: waap.DomainUpdateParamsStatusMonitor,
+    },
+)
+if err != nil {
+    log.Fatalf("Failed to update domain: %v", err)
+}
+
+fmt.Println("Domain updated to monitor mode")
+```
+
+## Delete
+
+Delete an inactive domain. Only domains with status 'bypass' can be deleted.
+
+### Method
+
+```go
+func (r *DomainService) Delete(
+    ctx context.Context,
+    domainID int64,
+    opts ...option.RequestOption,
+) error
+```
+
+### Parameters
+
+<ParamField path="domainID" type="int64" required>
+  The domain ID to delete
+</ParamField>
+
+### Example
+
+```go
+err := client.Waap.Domains.Delete(context.Background(), 12345)
+if err != nil {
+    log.Fatalf("Failed to delete domain: %v", err)
+}
+
+fmt.Println("Domain deleted successfully")
+```
+
+<Note>
+  Only domains with status 'bypass' can be deleted. Ensure the domain is in bypass mode before attempting deletion.
+</Note>
+
+## ListRuleSets
+
+Retrieve all rule sets linked to a domain.
+
+### Method
+
+```go
+func (r *DomainService) ListRuleSets(
+    ctx context.Context,
+    domainID int64,
+    opts ...option.RequestOption,
+) (*[]WaapRuleSet, error)
+```
+
+### Parameters
+
+<ParamField path="domainID" type="int64" required>
+  The domain ID
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="int64" required>
+  Identifier of the rule set
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Name of the rule set
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Detailed description of the rule set
+</ResponseField>
+
+<ResponseField name="is_active" type="bool" required>
+  Indicates if the rule set is currently active
+</ResponseField>
+
+<ResponseField name="tags" type="[]Tag" required>
+  Collection of tags associated with the rule set
+  
+  <ResponseField name="id" type="int64">
+    Tag identifier
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    Tag name
+  </ResponseField>
+  
+  <ResponseField name="description" type="string">
+    Tag description
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="resource_slug" type="string">
+  The resource slug associated with the rule set
+</ResponseField>
+
+<ResponseField name="rules" type="[]Rule">
+  Individual rules within the rule set
+  
+  <ResponseField name="id" type="string">
+    Unique identifier for the rule
+  </ResponseField>
+  
+  <ResponseField name="name" type="string">
+    Name of the rule
+  </ResponseField>
+  
+  <ResponseField name="description" type="string">
+    Detailed description of the rule
+  </ResponseField>
+  
+  <ResponseField name="action" type="string">
+    Action taken by the rule: `Allow`, `Block`, `Captcha`, `Gateway`, `Handshake`, `Monitor`, or `Composite`
+  </ResponseField>
+  
+  <ResponseField name="mode" type="bool">
+    Indicates if the rule is active
+  </ResponseField>
+  
+  <ResponseField name="group" type="string">
+    The rule group name
+  </ResponseField>
+  
+  <ResponseField name="rule_set_id" type="int64">
+    Identifier of the parent rule set
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+```go
+ruleSets, err := client.Waap.Domains.ListRuleSets(context.Background(), 12345)
+if err != nil {
+    log.Fatalf("Failed to list rule sets: %v", err)
+}
+
+for _, ruleSet := range *ruleSets {
+    fmt.Printf("Rule Set: %s (Active: %v)\n", ruleSet.Name, ruleSet.IsActive)
+    fmt.Printf("  Description: %s\n", ruleSet.Description)
+    
+    if len(ruleSet.Rules) > 0 {
+        fmt.Printf("  Rules (%d):\n", len(ruleSet.Rules))
+        for _, rule := range ruleSet.Rules {
+            fmt.Printf("    - %s: %s (Action: %s)\n",
+                rule.Name, rule.Description, rule.Action)
+        }
+    }
+}
+```
+
+## Domain Settings
+
+Domains support various settings for API protection and DDoS mitigation:
+
+### API Settings
+
+<ParamField body="api_urls" type="[]string">
+  The API URLs for a domain. Set a common base URL for all API paths
+</ParamField>
+
+<ParamField body="is_api" type="bool">
+  Indicates if the domain is an API domain. All requests are treated as API requests when true. If set, `api_urls` is ignored
+</ParamField>
+
+### DDoS Settings
+
+<ParamField body="burst_threshold" type="int64">
+  Detects sudden rises in traffic. If met and requests are at least 5x the last 2-second interval, DDoS protection activates. Default: 1000
+</ParamField>
+
+<ParamField body="global_threshold" type="int64">
+  Identifies DDoS attacks with slow traffic rises. If met and current requests are at least 2x the previous 10-second window, DDoS protection activates. Default: 5000
+</ParamField>
+
+<ParamField body="sub_second_threshold" type="int64">
+  Protects against traffic bursts. When reached, DDoS mode activates on the affected WAAP server. Default: 50
+</ParamField>
+
+## Domain Statuses
+
+### active
+Full WAAP protection is enabled. All security rules are enforced, and malicious traffic is blocked.
+
+### monitor
+Traffic is monitored and logged, but blocking actions are not enforced. Useful for testing rule configurations.
+
+### bypass
+WAAP protection is bypassed entirely. Traffic flows directly without inspection. Required status for domain deletion.
+
+### locked
+Domain is locked and cannot be modified. Contact support to unlock.

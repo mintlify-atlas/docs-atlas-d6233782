@@ -1,0 +1,142 @@
+---
+title: "File Uploads"
+description: "Learn how to upload files in multipart requests using the Gcore Go SDK"
+---
+
+## Overview
+
+Request parameters that correspond to file uploads in multipart requests are typed as `io.Reader`. The SDK provides flexible options for customizing file names and content types.
+
+## Default Behavior
+
+The contents of the `io.Reader` will by default be sent as a multipart form part with:
+- **File name**: `"anonymous_file"`
+- **Content-Type**: `"application/octet-stream"`
+
+## Customizing File Metadata
+
+The file name and content-type can be customized by implementing methods on the run-time type of `io.Reader`:
+- `Name() string` - for custom file name
+- `ContentType() string` - for custom content type
+
+<Info>
+`os.File` implements `Name() string`, so a file returned by `os.Open` will be sent with the file name on disk.
+</Info>
+
+### Using os.File
+
+```go
+file, err := os.Open("document.pdf")
+if err != nil {
+	panic(err)
+}
+defer file.Close()
+
+// The file will be uploaded with the name "document.pdf"
+response, err := client.Files.Upload(
+	context.TODO(),
+	FileUploadParams{
+		File: file,
+	},
+)
+```
+
+## Helper Function
+
+We provide a helper `gcore.File(reader io.Reader, filename string, contentType string)` which can be used to wrap any `io.Reader` with the appropriate file name and content type.
+
+### Using gcore.File Helper
+
+```go
+import (
+	"bytes"
+	"context"
+	"github.com/G-Core/gcore-go"
+)
+
+// Create a file from a byte buffer
+data := []byte("file contents")
+reader := bytes.NewReader(data)
+
+// Wrap with custom metadata
+file := gcore.File(reader, "custom-name.txt", "text/plain")
+
+response, err := client.Files.Upload(
+	context.TODO(),
+	FileUploadParams{
+		File: file,
+	},
+)
+```
+
+## Examples
+
+### Upload from Memory
+
+```go
+import "strings"
+
+content := "Hello, World!"
+reader := strings.NewReader(content)
+
+file := gcore.File(reader, "greeting.txt", "text/plain")
+
+response, err := client.Files.Upload(
+	context.TODO(),
+	FileUploadParams{
+		File: file,
+	},
+)
+```
+
+### Upload JSON Data
+
+```go
+import (
+	"bytes"
+	"encoding/json"
+)
+
+data := map[string]interface{}{
+	"key": "value",
+	"items": []int{1, 2, 3},
+}
+
+jsonData, err := json.Marshal(data)
+if err != nil {
+	panic(err)
+}
+
+reader := bytes.NewReader(jsonData)
+file := gcore.File(reader, "data.json", "application/json")
+
+response, err := client.Files.Upload(
+	context.TODO(),
+	FileUploadParams{
+		File: file,
+	},
+)
+```
+
+### Upload Binary Data
+
+```go
+import "bytes"
+
+// Binary data (e.g., image bytes)
+binaryData := []byte{0x89, 0x50, 0x4E, 0x47, /* ... */}
+reader := bytes.NewReader(binaryData)
+
+file := gcore.File(reader, "image.png", "image/png")
+
+response, err := client.Files.Upload(
+	context.TODO(),
+	FileUploadParams{
+		File: file,
+	},
+)
+```
+
+<Note>
+The `gcore.File` helper accepts any `io.Reader`, making it flexible for various data sources including files, buffers, streams, and HTTP responses.
+</Note>

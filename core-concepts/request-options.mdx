@@ -1,0 +1,576 @@
+---
+title: Request Options
+description: Learn how to use request options to customize API requests in the Gcore Go SDK
+---
+
+## Functional Options Pattern
+
+The Gcore Go SDK uses the [functional options pattern](https://dave.cheney.net/2014/10/17/functional-options-for-friendly-apis) for flexible configuration. Functions in the `option` package return a `RequestOption` that modifies request behavior.
+
+```go
+package main
+
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithAPIKey("your-api-key"),
+        option.WithMaxRetries(5),
+    )
+}
+```
+
+## Common Request Options
+
+The `option` package provides numerous request options for customizing behavior:
+
+### WithHeader
+
+Add or modify HTTP headers:
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+// Client-level header (applies to all requests)
+client := gcore.NewClient(
+    option.WithHeader("X-Custom-Header", "global-value"),
+)
+
+// Request-level header (applies to this request only)
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    cloud.ProjectNewParams{Name: "my-project"},
+    option.WithHeader("X-Custom-Header", "request-value"),
+)
+```
+
+<CodeGroup>
+```go Set Header
+// Sets or overwrites a header
+option.WithHeader("X-Custom-Header", "value")
+```
+
+```go Add Header
+// Adds to existing header values
+option.WithHeaderAdd("X-Custom-Header", "additional-value")
+```
+
+```go Delete Header
+// Removes a header
+option.WithHeaderDel("X-Custom-Header")
+```
+</CodeGroup>
+
+### WithMaxRetries
+
+Configure retry behavior for failed requests:
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+// Client-level: all requests retry up to 5 times
+client := gcore.NewClient(
+    option.WithMaxRetries(5),
+)
+
+// Request-level: this specific request retries up to 10 times
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    params,
+    option.WithMaxRetries(10),
+)
+
+// Disable retries
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    params,
+    option.WithMaxRetries(0),
+)
+```
+
+<Note>
+The SDK automatically retries:
+- Connection errors
+- 408 Request Timeout
+- 409 Conflict
+- 429 Rate Limit
+- 5xx Server Errors
+
+Default retry count is 2 (3 total attempts).
+</Note>
+
+### WithRequestTimeout
+
+Set timeout for individual request attempts (not including retries):
+
+```go
+import (
+    "context"
+    "time"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+// Set per-retry timeout
+client := gcore.NewClient(
+    option.WithRequestTimeout(30 * time.Second),
+)
+
+// Combined with context timeout
+ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+defer cancel()
+
+project, err := client.Cloud.Projects.New(
+    ctx, // Total timeout including retries: 5 minutes
+    params,
+    option.WithRequestTimeout(20*time.Second), // Per-attempt timeout: 20 seconds
+)
+```
+
+<Tip>
+Use context timeout for overall operation timeout (including retries) and `WithRequestTimeout()` for individual attempt timeout.
+</Tip>
+
+## Client-Level vs Request-Level Options
+
+### Client-Level Options
+
+Applied when creating the client and affect **all** requests:
+
+```go
+client := gcore.NewClient(
+    option.WithAPIKey("your-api-key"),
+    option.WithMaxRetries(3),
+    option.WithHeader("User-Agent", "MyApp/1.0"),
+    option.WithRequestTimeout(30*time.Second),
+)
+
+// All requests use these options
+project1, _ := client.Cloud.Projects.New(ctx, params1)
+project2, _ := client.Cloud.Projects.New(ctx, params2)
+```
+
+### Request-Level Options
+
+Applied to individual requests and **override** client-level options:
+
+```go
+client := gcore.NewClient(
+    option.WithMaxRetries(2), // Default: 2 retries
+)
+
+// This request uses 2 retries (client default)
+project1, _ := client.Cloud.Projects.New(ctx, params1)
+
+// This request uses 5 retries (overrides client default)
+project2, _ := client.Cloud.Projects.New(
+    ctx,
+    params2,
+    option.WithMaxRetries(5),
+)
+
+// This request uses 2 retries again (client default)
+project3, _ := client.Cloud.Projects.New(ctx, params3)
+```
+
+### Example: Override Pattern
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithHeader("X-Environment", "production"),
+        option.WithMaxRetries(2),
+    )
+    
+    // Use client defaults
+    project1, _ := client.Cloud.Projects.New(
+        context.TODO(),
+        cloud.ProjectNewParams{Name: "project1"},
+    )
+    // Header: X-Environment=production, Retries: 2
+    
+    // Override for specific request
+    project2, _ := client.Cloud.Projects.New(
+        context.TODO(),
+        cloud.ProjectNewParams{Name: "project2"},
+        option.WithHeader("X-Environment", "staging"),
+        option.WithMaxRetries(5),
+    )
+    // Header: X-Environment=staging, Retries: 5
+}
+```
+
+## WithDebugLog for Debugging
+
+The `WithDebugLog()` option logs complete HTTP requests and responses:
+
+```go
+import (
+    "log"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+// Use default logger
+client := gcore.NewClient(
+    option.WithDebugLog(nil),
+)
+
+// Use custom logger
+customLogger := log.New(os.Stdout, "[GCORE] ", log.LstdFlags)
+client := gcore.NewClient(
+    option.WithDebugLog(customLogger),
+)
+```
+
+<Warning>
+`WithDebugLog()` is for development and debugging only. It logs sensitive information including API keys and request/response bodies. Never use in production.
+</Warning>
+
+### Debug Log Output Example
+
+```go
+package main
+
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    client := gcore.NewClient(
+        option.WithDebugLog(nil),
+    )
+    
+    _, err := client.Cloud.Projects.New(
+        context.TODO(),
+        cloud.ProjectNewParams{Name: "debug-test"},
+    )
+}
+```
+
+Output:
+```
+Request Content:
+POST /cloud/v1/projects HTTP/1.1
+Host: api.gcore.com
+Authorization: APIKey your-api-key
+Content-Type: application/json
+
+{"name":"debug-test"}
+
+Response Content:
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{"id":12345,"name":"debug-test"}
+```
+
+## Advanced Options
+
+### WithMiddleware
+
+Add custom middleware for request/response processing:
+
+```go
+import (
+    "fmt"
+    "net/http"
+    "time"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func LoggingMiddleware(req *http.Request, next option.MiddlewareNext) (*http.Response, error) {
+    start := time.Now()
+    fmt.Printf("Request: %s %s\n", req.Method, req.URL.Path)
+    
+    resp, err := next(req)
+    
+    duration := time.Since(start)
+    if err != nil {
+        fmt.Printf("Error: %s (took %v)\n", err, duration)
+    } else {
+        fmt.Printf("Response: %d (took %v)\n", resp.StatusCode, duration)
+    }
+    
+    return resp, err
+}
+
+client := gcore.NewClient(
+    option.WithMiddleware(LoggingMiddleware),
+)
+```
+
+### WithJSONSet and WithJSONDel
+
+Modify request JSON body using [sjson syntax](https://github.com/tidwall/sjson):
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+params := cloud.ProjectNewParams{
+    Name: "my-project",
+}
+
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    params,
+    // Add undocumented field
+    option.WithJSONSet("custom_field", "custom_value"),
+    // Add nested field
+    option.WithJSONSet("metadata.environment", "production"),
+)
+```
+
+<Note>
+Use `WithJSONSet()` to add fields not yet supported by the SDK or for experimental API features.
+</Note>
+
+### WithResponseInto
+
+Capture the raw HTTP response:
+
+```go
+import (
+    "context"
+    "fmt"
+    "net/http"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+var response *http.Response
+project, err := client.Cloud.Projects.New(
+    context.TODO(),
+    cloud.ProjectNewParams{Name: "my-project"},
+    option.WithResponseInto(&response),
+)
+
+if err != nil {
+    panic(err)
+}
+
+fmt.Printf("Status Code: %d\n", response.StatusCode)
+fmt.Printf("Headers: %+v\n", response.Header)
+fmt.Printf("Content-Type: %s\n", response.Header.Get("Content-Type"))
+```
+
+### WithQuery
+
+Add or modify query parameters:
+
+<CodeGroup>
+```go Set Query Parameter
+// Sets or overwrites query parameter
+option.WithQuery("filter", "active")
+```
+
+```go Add Query Parameter
+// Adds to existing parameter values
+option.WithQueryAdd("tag", "production")
+option.WithQueryAdd("tag", "critical")
+```
+
+```go Delete Query Parameter
+// Removes query parameter
+option.WithQueryDel("filter")
+```
+</CodeGroup>
+
+### WithHTTPClient
+
+Use a custom HTTP client:
+
+```go
+import (
+    "net/http"
+    "time"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/option"
+)
+
+// Custom HTTP client with specific settings
+httpClient := &http.Client{
+    Timeout: 60 * time.Second,
+    Transport: &http.Transport{
+        MaxIdleConns:        100,
+        MaxIdleConnsPerHost: 10,
+        IdleConnTimeout:     90 * time.Second,
+    },
+}
+
+client := gcore.NewClient(
+    option.WithHTTPClient(httpClient),
+)
+```
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "net/http"
+    "time"
+    
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+    // Custom HTTP client
+    httpClient := &http.Client{
+        Timeout: 60 * time.Second,
+    }
+    
+    // Client with multiple options
+    client := gcore.NewClient(
+        // Authentication
+        option.WithAPIKey("your-api-key"),
+        
+        // HTTP configuration
+        option.WithHTTPClient(httpClient),
+        option.WithMaxRetries(3),
+        option.WithRequestTimeout(30*time.Second),
+        
+        // Headers
+        option.WithHeader("User-Agent", "MyApp/2.0"),
+        option.WithHeader("X-Environment", "production"),
+        
+        // Cloud settings
+        option.WithCloudProjectID(12345),
+        option.WithCloudRegionID(67890),
+    )
+    
+    // Standard request (uses client defaults)
+    project1, err := client.Cloud.Projects.New(
+        context.TODO(),
+        cloud.ProjectNewParams{Name: "standard-project"},
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Created project: %d\n", project1.ID)
+    
+    // Request with overrides
+    var response *http.Response
+    project2, err := client.Cloud.Projects.New(
+        context.TODO(),
+        cloud.ProjectNewParams{Name: "custom-project"},
+        // Override client-level options
+        option.WithMaxRetries(10),
+        option.WithHeader("X-Environment", "staging"),
+        // Capture response
+        option.WithResponseInto(&response),
+    )
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Printf("Created project: %d (HTTP %d)\n", project2.ID, response.StatusCode)
+}
+```
+
+## Best Practices
+
+### 1. Use Client-Level Options for Common Settings
+
+```go
+// ✅ Good - Common settings at client level
+client := gcore.NewClient(
+    option.WithAPIKey("key"),
+    option.WithMaxRetries(3),
+    option.WithRequestTimeout(30*time.Second),
+)
+
+// ❌ Bad - Repeating options on every request
+project, _ := client.Cloud.Projects.New(
+    ctx, params,
+    option.WithMaxRetries(3),
+    option.WithRequestTimeout(30*time.Second),
+)
+```
+
+### 2. Use Request-Level Options for Exceptions
+
+```go
+// ✅ Good - Override only when needed
+project, _ := client.Cloud.Projects.New(
+    ctx, params,
+    option.WithMaxRetries(10), // This specific operation needs more retries
+)
+```
+
+### 3. Disable Debug Logging in Production
+
+```go
+import "os"
+
+func newClient() *gcore.Client {
+    opts := []option.RequestOption{
+        option.WithAPIKey(os.Getenv("GCORE_API_KEY")),
+    }
+    
+    // Only enable debug logging in development
+    if os.Getenv("ENV") == "development" {
+        opts = append(opts, option.WithDebugLog(nil))
+    }
+    
+    return gcore.NewClient(opts...)
+}
+```
+
+### 4. Combine Context and Request Timeouts
+
+```go
+import "time"
+
+// Set overall timeout with context
+ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+defer cancel()
+
+// Set per-retry timeout with option
+project, err := client.Cloud.Projects.New(
+    ctx,
+    params,
+    option.WithRequestTimeout(20*time.Second),
+)
+// Maximum time: 2 minutes (context)
+// Per attempt: 20 seconds (option)
+```

@@ -1,97 +1,130 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "Gcore Go SDK"
+description: "The official Go library for the Gcore API - build cloud infrastructure, CDN, storage, and streaming applications with type-safe Go code"
 ---
 
-## Setting up
+## Overview
 
-Get your documentation site up and running in minutes.
+The Gcore Go SDK provides convenient access to the [Gcore REST API](https://api.gcore.com/docs) from applications written in Go. Built with [Stainless](https://www.stainless.com/), it offers type-safe client libraries for managing cloud infrastructure, CDN resources, DNS, object storage, video streaming, and more.
 
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with the Gcore Go SDK in minutes
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="Installation" icon="download" href="/installation">
+    Install the SDK and configure your environment
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="API Reference" icon="book" href="/api-reference/overview">
+    Explore the complete API documentation
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="Examples" icon="code" href="https://github.com/G-Core/gcore-go/tree/main/examples">
+    View code examples on GitHub
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Key Features
 
-Everything you need to create world-class documentation.
+<CardGroup cols={2}>
+  <Card title="Type-Safe Client" icon="shield-check">
+    Fully typed Go client with compile-time safety and IDE autocomplete
+  </Card>
+  <Card title="Auto-Pagination" icon="arrows-rotate">
+    Built-in support for automatic pagination with `ListAutoPaging()` methods
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation">
+    Comprehensive error types with detailed request/response information
+  </Card>
+  <Card title="Retry Logic" icon="rotate">
+    Automatic retries with exponential backoff for transient failures
+  </Card>
+  <Card title="Middleware Support" icon="plug">
+    Extensible middleware system for custom request/response handling
+  </Card>
+  <Card title="Request Options" icon="sliders">
+    Flexible configuration with per-request and client-level options
+  </Card>
+</CardGroup>
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
-  </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
-  </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
-  </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
-  </Card>
-</Columns>
+## Services
 
-## Need inspiration?
+The Gcore Go SDK provides access to multiple Gcore services:
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+<CardGroup cols={3}>
+  <Card title="Cloud" icon="cloud" href="/api-reference/cloud/overview">
+    Virtual machines, bare metal servers, Kubernetes, and more
+  </Card>
+  <Card title="CDN" icon="network-wired" href="/api-reference/cdn/overview">
+    Content delivery network resources and configuration
+  </Card>
+  <Card title="DNS" icon="globe" href="/api-reference/dns/overview">
+    DNS zone and record management
+  </Card>
+  <Card title="Storage" icon="database" href="/api-reference/storage/overview">
+    S3-compatible object storage
+  </Card>
+  <Card title="Streaming" icon="video" href="/api-reference/streaming/overview">
+    Live and on-demand video streaming
+  </Card>
+  <Card title="IAM" icon="users" href="/api-reference/iam/overview">
+    Identity and access management
+  </Card>
+  <Card title="WAAP" icon="shield-halved" href="/api-reference/waap/overview">
+    Web application and API protection
+  </Card>
+  <Card title="Security" icon="lock" href="/api-reference/security/overview">
+    Security services and monitoring
+  </Card>
+  <Card title="Fastedge" icon="bolt" href="/api-reference/fastedge/overview">
+    Edge computing applications
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/G-Core/gcore-go"
+	"github.com/G-Core/gcore-go/cloud"
+	"github.com/G-Core/gcore-go/option"
+)
+
+func main() {
+	client := gcore.NewClient(
+		option.WithAPIKey("My API Key"), // defaults to os.LookupEnv("GCORE_API_KEY")
+	)
+	
+	project, err := client.Cloud.Projects.New(context.TODO(), cloud.ProjectNewParams{
+		Name: "my-project",
+	})
+	if err != nil {
+		panic(err.Error())
+	}
+	fmt.Printf("%+v\n", project.ID)
+}
+```
+
+## Requirements
+
+This library requires Go 1.22 or higher.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/core-concepts/authentication">
+    Learn how to configure API keys and authenticate requests
+  </Card>
+  <Card title="Error Handling" icon="bug" href="/core-concepts/error-handling">
+    Understand error types and how to handle API errors
+  </Card>
+  <Card title="Pagination" icon="list" href="/core-concepts/pagination">
+    Work with paginated list endpoints efficiently
+  </Card>
+  <Card title="Request Options" icon="gear" href="/core-concepts/request-options">
+    Customize requests with headers, timeouts, and more
+  </Card>
+</CardGroup>

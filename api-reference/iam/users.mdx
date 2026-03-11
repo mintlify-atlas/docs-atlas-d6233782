@@ -1,0 +1,319 @@
+---
+title: "User Management"
+description: "Manage user accounts, invitations, and permissions in your Gcore account"
+---
+
+## Overview
+
+The User service provides methods to manage users within your Gcore account, including creating invitations, updating user details, listing users, and managing access.
+
+## List Users
+
+Retrieve a list of all users in your account. Supports pagination when the `limit` parameter is provided.
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go/iam"
+)
+
+// List all users without pagination
+users, err := client.IAM.Users.List(context.Background(), iam.UserListParams{})
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, user := range users.Results {
+    fmt.Printf("User: %s (%s)\n", user.Name, user.Email)
+}
+```
+
+### With Pagination
+
+```go
+// List users with pagination
+users, err := client.IAM.Users.List(context.Background(), iam.UserListParams{
+    Limit:  param.Opt(int64(20)),
+    Offset: param.Opt(int64(0)),
+})
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+### Auto-Pagination
+
+```go
+// Automatically iterate through all pages
+iter := client.IAM.Users.ListAutoPaging(context.Background(), iam.UserListParams{
+    Limit: param.Opt(int64(50)),
+})
+
+for iter.Next() {
+    user := iter.Current()
+    fmt.Printf("User: %s\n", user.Email)
+}
+
+if err := iter.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="limit" type="int64">
+  The maximum number of users to return per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Offset relative to the beginning of the list
+</ParamField>
+
+## Get User Details
+
+Retrieve detailed information about a specific user by their ID.
+
+```go
+user, err := client.IAM.Users.Get(context.Background(), userID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Name: %s\n", user.Name)
+fmt.Printf("Email: %s\n", user.Email)
+fmt.Printf("Activated: %t\n", user.Activated)
+```
+
+<ParamField path="userID" type="int64" required>
+  The unique identifier of the user
+</ParamField>
+
+### Response Fields
+
+<ResponseField name="id" type="int64" required>
+  User's unique identifier
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  User's full name
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  User's email address
+</ResponseField>
+
+<ResponseField name="activated" type="boolean" required>
+  Email confirmation status. `true` if user confirmed their email, `false` otherwise
+</ResponseField>
+
+<ResponseField name="is_active" type="boolean" required>
+  User activity flag
+</ResponseField>
+
+<ResponseField name="phone" type="string" required>
+  User's phone number
+</ResponseField>
+
+<ResponseField name="company" type="string" required>
+  User's company name
+</ResponseField>
+
+<ResponseField name="lang" type="string" required>
+  User's language preference. Defines language of the control panel and email messages. Values: `de`, `en`, `ru`, `zh`, `az`
+</ResponseField>
+
+<ResponseField name="groups" type="array" required>
+  User's groups in the current account. Each group contains `id` and `name`
+</ResponseField>
+
+<ResponseField name="auth_types" type="array" required>
+  List of authentication types available for the user. Values: `password`, `sso`, `github`, `google-oauth2`
+</ResponseField>
+
+<ResponseField name="client" type="float64" required>
+  User's account ID
+</ResponseField>
+
+<ResponseField name="client_and_roles" type="array" required>
+  List of clients the user has access to, including role information for each client
+</ResponseField>
+
+<ResponseField name="deleted" type="boolean" required>
+  Deletion flag. `true` if user was deleted
+</ResponseField>
+
+<ResponseField name="two_fa" type="boolean" required>
+  Two-factor authentication status. `true` if enabled, `false` if disabled
+</ResponseField>
+
+<ResponseField name="sso_auth" type="boolean" required>
+  SSO authentication flag. `true` if user can login via SAML SSO
+</ResponseField>
+
+<ResponseField name="user_type" type="string" required>
+  User's type. Values: `common`, `reseller`, `seller`
+</ResponseField>
+
+<ResponseField name="reseller" type="int64" required>
+  Services provider ID
+</ResponseField>
+
+## Invite User
+
+Invite a new user to your account. The user will receive an email with instructions to create an account or accept the invitation.
+
+```go
+invitation, err := client.IAM.Users.Invite(context.Background(), iam.UserInviteParams{
+    ClientID: 12345,
+    Email:    "[email protected]",
+    Name:     param.Opt("John Doe"),
+    Lang:     iam.UserLanguageEn,
+    UserRole: iam.UserGroupParam{
+        ID: param.Opt(int64(2)), // Users group
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("User invited with ID: %d\n", invitation.UserID)
+fmt.Printf("Status: %s\n", invitation.Status)
+```
+
+<ParamField path="client_id" type="int64" required>
+  ID of the account to invite the user to
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  Email address of the user to invite
+</ParamField>
+
+<ParamField path="user_role" type="object" required>
+  Role to assign to the user. Specify either `id` or `name`:
+  - ID `1` or name `Administrators`
+  - ID `2` or name `Users`
+  - ID `5` or name `Engineers`
+  - ID `3022` or name `Purge and Prefetch only (API)`
+  - ID `3009` or name `Purge and Prefetch only (API+Web)`
+</ParamField>
+
+<ParamField path="name" type="string">
+  User's full name (optional)
+</ParamField>
+
+<ParamField path="lang" type="string">
+  User's language preference. Values: `de`, `en`, `ru`, `zh`, `az`
+</ParamField>
+
+### Response
+
+<ResponseField name="user_id" type="int64" required>
+  The ID of the invited user
+</ResponseField>
+
+<ResponseField name="status" type="string" required>
+  Status of the invitation
+</ResponseField>
+
+## Update User
+
+Update a user's details including name, email, phone, language, and authentication types.
+
+```go
+updatedUser, err := client.IAM.Users.Update(context.Background(), userID, iam.UserUpdateParams{
+    Name:  param.Opt("Jane Smith"),
+    Phone: param.Opt("+1234567890"),
+    Email: "[email protected]",
+    Lang:  iam.UserLanguageEn,
+    AuthTypes: []iam.AuthType{
+        iam.AuthTypePassword,
+        iam.AuthTypeGoogleOauth2,
+    },
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Updated user: %s\n", updatedUser.Email)
+```
+
+<ParamField path="userID" type="int64" required>
+  The unique identifier of the user to update
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  User's full name
+</ParamField>
+
+<ParamField path="phone" type="string" required>
+  User's phone number
+</ParamField>
+
+<ParamField path="email" type="string" required>
+  User's email address
+</ParamField>
+
+<ParamField path="lang" type="string" required>
+  User's language preference. Values: `de`, `en`, `ru`, `zh`, `az`
+</ParamField>
+
+<ParamField path="auth_types" type="array" required>
+  List of authentication types to enable for the user. Values: `password`, `sso`, `github`, `google-oauth2`
+</ParamField>
+
+## Delete User
+
+Revoke a user's access to the specified account. If the user doesn't have access to multiple accounts, the user will be deleted entirely.
+
+```go
+err := client.IAM.Users.Delete(context.Background(), userID, iam.UserDeleteParams{
+    ClientID: 12345,
+})
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("User access revoked")
+```
+
+<ParamField path="userID" type="int64" required>
+  The unique identifier of the user to delete
+</ParamField>
+
+<ParamField path="clientId" type="int64" required>
+  The account ID from which to revoke the user's access
+</ParamField>
+
+<Warning>
+  This action cannot be reversed. If the user has access to multiple accounts, only their access to the specified account will be revoked. If this is their only account, the user will be permanently deleted.
+</Warning>
+
+## User Roles and Permissions
+
+Each user can be assigned to one or more groups that define their permissions:
+
+### Administrator
+- **ID**: 1
+- **Permissions**: Full access to all account features and settings
+
+### Users
+- **ID**: 2
+- **Permissions**: Standard user access with limited administrative capabilities
+
+### Engineers
+- **ID**: 5
+- **Permissions**: Technical access with engineering-specific permissions
+
+### Purge and Prefetch only (API)
+- **ID**: 3022
+- **Permissions**: Limited to purge and prefetch operations via API only
+
+### Purge and Prefetch only (API+Web)
+- **ID**: 3009
+- **Permissions**: Limited to purge and prefetch operations via both API and web interface
+
+## Best Practices
+
+1. **Use appropriate roles**: Assign the minimum required permissions to each user
+2. **Enable two-factor authentication**: Encourage users to enable 2FA for enhanced security
+3. **Regular audits**: Periodically review user access and remove inactive users
+4. **SSO integration**: Consider using SAML SSO for enterprise authentication
+5. **Language preferences**: Set the correct language for each user to improve their experience

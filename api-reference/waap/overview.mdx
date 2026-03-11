@@ -1,0 +1,152 @@
+---
+title: "WAAP Overview"
+description: "Web Application and API Protection service for monitoring and defending web applications against security threats"
+---
+
+## Overview
+
+The WAAP (Web Application and API Protection) service provides comprehensive security for your web applications and APIs. It includes features for threat detection, rule management, statistics, and protection against various attack vectors including DDoS attacks.
+
+## Service Structure
+
+The WAAP service includes the following sub-services:
+
+- **Domains** - Manage protected domains with their own rules and configurations
+- **Statistics** - View security metrics and analytics
+- **CustomPageSets** - Configure custom error and block pages
+- **AdvancedRules** - Create sophisticated rules using CEL expressions
+- **Tags** - Organize and categorize resources
+- **Organizations** - Manage organizational settings
+- **Insights** - Get security insights and recommendations
+- **IPInfo** - Retrieve information about IP addresses
+
+## Initialization
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+)
+
+client := gcore.NewClient()
+waapService := client.Waap
+```
+
+## GetAccountOverview
+
+Retrieve information about the WAAP service for your account.
+
+### Method
+
+```go
+func (r *WaapService) GetAccountOverview(
+    ctx context.Context,
+    opts ...option.RequestOption,
+) (*WaapGetAccountOverviewResponse, error)
+```
+
+### Parameters
+
+<ParamField path="ctx" type="context.Context" required>
+  The context for the API request
+</ParamField>
+
+<ParamField path="opts" type="...option.RequestOption">
+  Additional request options
+</ParamField>
+
+### Response
+
+<ResponseField name="id" type="int64" required>
+  The client ID
+</ResponseField>
+
+<ResponseField name="features" type="[]string" required>
+  List of enabled features for this account
+</ResponseField>
+
+<ResponseField name="quotas" type="map[string]Quota" required>
+  Resource quotas for the account
+  
+  <ResponseField name="allowed" type="int64">
+    The maximum allowed number of this resource
+  </ResponseField>
+  
+  <ResponseField name="current" type="int64">
+    The current number of this resource
+  </ResponseField>
+</ResponseField>
+
+<ResponseField name="service" type="Service" required>
+  Information about the WAAP service status
+  
+  <ResponseField name="enabled" type="bool">
+    Whether the service is enabled
+  </ResponseField>
+</ResponseField>
+
+### Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    
+    "github.com/G-Core/gcore-go"
+)
+
+func main() {
+    client := gcore.NewClient()
+    
+    overview, err := client.Waap.GetAccountOverview(context.Background())
+    if err != nil {
+        log.Fatalf("Failed to get account overview: %v", err)
+    }
+    
+    fmt.Printf("Client ID: %d\n", overview.ID)
+    fmt.Printf("Service Enabled: %v\n", overview.Service.Enabled)
+    fmt.Printf("Features: %v\n", overview.Features)
+    
+    for resource, quota := range overview.Quotas {
+        fmt.Printf("%s: %d/%d\n", resource, quota.Current, quota.Allowed)
+    }
+}
+```
+
+## Key Concepts
+
+### Domain Statuses
+
+Domains can have the following statuses:
+
+- **active** - Full WAAP protection is enabled
+- **monitor** - Traffic is monitored but not blocked
+- **bypass** - WAAP protection is bypassed
+- **locked** - Domain is locked and cannot be modified
+
+### Rule Types
+
+WAAP supports multiple types of security rules:
+
+1. **Advanced Rules** - Flexible rules using CEL expressions
+2. **Custom Rules** - Domain-specific custom security rules
+3. **Firewall Rules** - Network-level firewall rules
+4. **Rule Sets** - Collections of pre-configured security rules
+
+### Actions
+
+Rules can trigger the following actions:
+
+- **Allow** - Allow the request to proceed
+- **Block** - Block the request with a configurable status code
+- **Captcha** - Present a CAPTCHA challenge
+- **Handshake** - Perform automatic browser validation
+- **Monitor** - Log the event but take no action
+- **Tag** - Add tags to the request for tracking
+
+## Related Resources
+
+- [Protected Domains](/api-reference/waap/domains)
+- [Security Rules](/api-reference/waap/rules)

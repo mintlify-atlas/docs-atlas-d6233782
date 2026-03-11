@@ -1,0 +1,474 @@
+---
+title: "CDN Logs"
+description: "Access and download CDN operation logs for monitoring and analysis"
+---
+
+CDN logs provide detailed information about CDN operations, including request details, cache status, response codes, and client information. Logs are available for up to 3 days.
+
+<Note>
+  For complete log data and longer retention, use the Logs Uploader service.
+</Note>
+
+## List Logs
+
+Retrieve CDN logs with filtering and pagination.
+
+```go
+import (
+    "context"
+    "fmt"
+    "log"
+
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+params := cdn.LogListParams{
+    From:         "2024-01-15T10:00:00Z",
+    To:           "2024-01-15T16:00:00Z",
+    ResourceIDEq: param.NewOpt[int64](123456),
+    StatusGte:    param.NewOpt[int64](200),
+    StatusLt:     param.NewOpt[int64](300),
+    Limit:        param.NewOpt[int64](100),
+}
+
+logs, err := client.CDN.Logs.List(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+for logs.Next() {
+    entry := logs.Current()
+    fmt.Printf("%d %s %s %d %s\n",
+        entry.Timestamp,
+        entry.Method,
+        entry.Path,
+        entry.Status,
+        entry.CacheStatus,
+    )
+}
+```
+
+<ParamField path="from" type="string" required>
+  Start date and time (ISO 8601/RFC 3339 format, UTC). Example: `2024-01-15T10:00:00Z`
+</ParamField>
+
+<ParamField path="to" type="string" required>
+  End date and time (ISO 8601/RFC 3339 format, UTC). Maximum 6 hours from `from`
+</ParamField>
+
+<ParamField path="resource_id__eq" type="int64">
+  Filter by exact CDN resource ID
+</ParamField>
+
+<ParamField path="cname__eq" type="string">
+  Filter by exact CDN resource CNAME
+</ParamField>
+
+<ParamField path="cname__contains" type="string">
+  Filter by partial CNAME match (minimum 3 characters)
+</ParamField>
+
+<ParamField path="client_ip__eq" type="string">
+  Filter by exact client IP address
+</ParamField>
+
+<ParamField path="status__eq" type="int64">
+  Filter by exact HTTP status code
+</ParamField>
+
+<ParamField path="status__gte" type="int64">
+  Filter by status code greater than or equal to value
+</ParamField>
+
+<ParamField path="status__lt" type="int64">
+  Filter by status code less than value
+</ParamField>
+
+<ParamField path="cache_status__eq" type="string">
+  Filter by cache status: `HIT`, `MISS`, `BYPASS`, `EXPIRED`, `STALE`, `PENDING`, `UPDATING`, `REVALIDATED`, or `-`
+</ParamField>
+
+<ParamField path="method__eq" type="string">
+  Filter by HTTP method: `GET`, `POST`, `PUT`, `DELETE`, `PATCH`, `HEAD`, `OPTIONS`, `CONNECT`, or `TRACE`
+</ParamField>
+
+<ParamField path="datacenter__eq" type="string">
+  Filter by data center where the request was processed
+</ParamField>
+
+<ParamField path="limit" type="int64">
+  Maximum number of log entries to return per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Number of log entries to skip from the beginning
+</ParamField>
+
+<ParamField path="ordering" type="string">
+  Sort results by fields. Prefix with `-` for descending order. Multiple values separated by comma.
+  
+  Available fields: `timestamp`, `method`, `client_ip`, `status`, `size`, `cname`, `resource_id`, `cache_status`, `datacenter`
+  
+  Example: `-timestamp,status`
+</ParamField>
+
+<ParamField path="fields" type="string">
+  Comma-separated list of fields to return. If not specified, all fields are returned.
+  
+  Example: `timestamp,path,status,cache_status`
+</ParamField>
+
+## Response Fields
+
+<ResponseField name="timestamp" type="int64">
+  Unix timestamp when the request was made
+</ResponseField>
+
+<ResponseField name="resource_id" type="int64">
+  CDN resource ID that served the request
+</ResponseField>
+
+<ResponseField name="cname" type="string">
+  CDN resource custom domain
+</ResponseField>
+
+<ResponseField name="client_ip" type="string">
+  IP address of the client that made the request
+</ResponseField>
+
+<ResponseField name="method" type="string">
+  HTTP method used in the request
+</ResponseField>
+
+<ResponseField name="path" type="string">
+  Requested URL path
+</ResponseField>
+
+<ResponseField name="status" type="int64">
+  HTTP response status code
+</ResponseField>
+
+<ResponseField name="size" type="int64">
+  Response size in bytes
+</ResponseField>
+
+<ResponseField name="cache_status" type="string">
+  Cache status: `HIT`, `MISS`, `BYPASS`, `EXPIRED`, `STALE`, `PENDING`, `UPDATING`, `REVALIDATED`, or `-`
+</ResponseField>
+
+<ResponseField name="datacenter" type="string">
+  Data center that processed the request
+</ResponseField>
+
+<ResponseField name="user_agent" type="string">
+  Value of the User-Agent header
+</ResponseField>
+
+<ResponseField name="referer" type="string">
+  Value of the Referer header
+</ResponseField>
+
+<ResponseField name="sent_http_content_type" type="string">
+  MIME type of the transmitted resource (Content-Type header)
+</ResponseField>
+
+<ResponseField name="tcpinfo_rtt" type="int64">
+  Round-trip time in microseconds for TCP transmission
+</ResponseField>
+
+## Download Logs
+
+Download logs as a compressed file for offline analysis.
+
+```go
+params := cdn.LogDownloadParams{
+    Format:       "csv",
+    From:         "2024-01-15T10:00:00Z",
+    To:           "2024-01-15T16:00:00Z",
+    ResourceIDEq: param.NewOpt[int64](123456),
+    StatusGte:    param.NewOpt[int64](200),
+    StatusLt:     param.NewOpt[int64](300),
+}
+
+resp, err := client.CDN.Logs.Download(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+defer resp.Body.Close()
+
+// Save to file
+out, err := os.Create("cdn-logs.zip")
+if err != nil {
+    log.Fatal(err)
+}
+defer out.Close()
+
+_, err = io.Copy(out, resp.Body)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Logs downloaded to cdn-logs.zip")
+```
+
+<ParamField path="format" type="string" required>
+  Output format: `csv` or `tsv`
+</ParamField>
+
+<ParamField path="from" type="string" required>
+  Start date and time (ISO 8601 format, UTC)
+</ParamField>
+
+<ParamField path="to" type="string" required>
+  End date and time (ISO 8601 format, UTC). Maximum 6 hours from `from`
+</ParamField>
+
+<ParamField path="sort" type="string">
+  Sort order. Prefix with `-` for descending. Example: `-timestamp,status`
+</ParamField>
+
+All filter parameters from the List method are also supported.
+
+## Filtering Examples
+
+### Filter by 2xx Status Codes
+
+```go
+params := cdn.LogListParams{
+    From:      "2024-01-15T10:00:00Z",
+    To:        "2024-01-15T16:00:00Z",
+    StatusGte: param.NewOpt[int64](200),
+    StatusLt:  param.NewOpt[int64](300),
+}
+```
+
+### Filter by Multiple Cache Statuses
+
+```go
+params := cdn.LogListParams{
+    From:          "2024-01-15T10:00:00Z",
+    To:            "2024-01-15T16:00:00Z",
+    CacheStatusIn: param.NewOpt("HIT,MISS,EXPIRED"),
+}
+```
+
+### Filter by Client IP Range
+
+```go
+params := cdn.LogListParams{
+    From:       "2024-01-15T10:00:00Z",
+    To:         "2024-01-15T16:00:00Z",
+    ClientIPIn: param.NewOpt("192.168.1.1,192.168.1.2,10.0.0.1"),
+}
+```
+
+### Filter by HTTP Methods
+
+```go
+params := cdn.LogListParams{
+    From:     "2024-01-15T10:00:00Z",
+    To:       "2024-01-15T16:00:00Z",
+    MethodIn: param.NewOpt("POST,PUT,DELETE"),
+}
+```
+
+### Filter by Data Center
+
+```go
+params := cdn.LogListParams{
+    From:         "2024-01-15T10:00:00Z",
+    To:           "2024-01-15T16:00:00Z",
+    DatacenterIn: param.NewOpt("ams,fra,lon"),
+}
+```
+
+## Auto-Paging
+
+Use auto-paging to iterate through all results automatically:
+
+```go
+params := cdn.LogListParams{
+    From:         "2024-01-15T10:00:00Z",
+    To:           "2024-01-15T16:00:00Z",
+    ResourceIDEq: param.NewOpt[int64](123456),
+}
+
+iter := client.CDN.Logs.ListAutoPaging(context.Background(), params)
+
+for iter.Next() {
+    entry := iter.Current()
+    fmt.Printf("%d %s %s %d\n",
+        entry.Timestamp,
+        entry.Method,
+        entry.Path,
+        entry.Status,
+    )
+}
+
+if err := iter.Err(); err != nil {
+    log.Fatal(err)
+}
+```
+
+## Analysis Examples
+
+### Cache Hit Rate Analysis
+
+```go
+params := cdn.LogListParams{
+    From:         "2024-01-15T00:00:00Z",
+    To:           "2024-01-15T23:59:59Z",
+    ResourceIDEq: param.NewOpt[int64](123456),
+}
+
+iter := client.CDN.Logs.ListAutoPaging(context.Background(), params)
+
+totalRequests := 0
+cacheHits := 0
+
+for iter.Next() {
+    entry := iter.Current()
+    totalRequests++
+    if entry.CacheStatus == "HIT" {
+        cacheHits++
+    }
+}
+
+hitRate := float64(cacheHits) / float64(totalRequests) * 100
+fmt.Printf("Cache hit rate: %.2f%% (%d hits / %d requests)\n",
+    hitRate, cacheHits, totalRequests)
+```
+
+### Top Client IPs
+
+```go
+params := cdn.LogListParams{
+    From: "2024-01-15T00:00:00Z",
+    To:   "2024-01-15T23:59:59Z",
+}
+
+iter := client.CDN.Logs.ListAutoPaging(context.Background(), params)
+
+ipCounts := make(map[string]int)
+
+for iter.Next() {
+    entry := iter.Current()
+    ipCounts[entry.ClientIP]++
+}
+
+// Sort and display top IPs
+type ipCount struct {
+    ip    string
+    count int
+}
+
+var sorted []ipCount
+for ip, count := range ipCounts {
+    sorted = append(sorted, ipCount{ip, count})
+}
+
+sort.Slice(sorted, func(i, j int) bool {
+    return sorted[i].count > sorted[j].count
+})
+
+fmt.Println("Top 10 client IPs:")
+for i := 0; i < 10 && i < len(sorted); i++ {
+    fmt.Printf("%d. %s: %d requests\n", i+1, sorted[i].ip, sorted[i].count)
+}
+```
+
+### Bandwidth Usage
+
+```go
+params := cdn.LogListParams{
+    From:         "2024-01-15T00:00:00Z",
+    To:           "2024-01-15T23:59:59Z",
+    ResourceIDEq: param.NewOpt[int64](123456),
+}
+
+iter := client.CDN.Logs.ListAutoPaging(context.Background(), params)
+
+var totalBytes int64
+
+for iter.Next() {
+    entry := iter.Current()
+    totalBytes += entry.Size
+}
+
+totalMB := float64(totalBytes) / 1024 / 1024
+totalGB := totalMB / 1024
+
+fmt.Printf("Total bandwidth: %.2f GB (%.2f MB)\n", totalGB, totalMB)
+```
+
+### Error Rate Analysis
+
+```go
+params := cdn.LogListParams{
+    From:         "2024-01-15T00:00:00Z",
+    To:           "2024-01-15T23:59:59Z",
+    ResourceIDEq: param.NewOpt[int64](123456),
+}
+
+iter := client.CDN.Logs.ListAutoPaging(context.Background(), params)
+
+statusGroups := map[string]int{
+    "2xx": 0,
+    "3xx": 0,
+    "4xx": 0,
+    "5xx": 0,
+}
+
+totalRequests := 0
+
+for iter.Next() {
+    entry := iter.Current()
+    totalRequests++
+    
+    switch {
+    case entry.Status >= 200 && entry.Status < 300:
+        statusGroups["2xx"]++
+    case entry.Status >= 300 && entry.Status < 400:
+        statusGroups["3xx"]++
+    case entry.Status >= 400 && entry.Status < 500:
+        statusGroups["4xx"]++
+    case entry.Status >= 500 && entry.Status < 600:
+        statusGroups["5xx"]++
+    }
+}
+
+fmt.Printf("Status code distribution:\n")
+for group, count := range statusGroups {
+    percentage := float64(count) / float64(totalRequests) * 100
+    fmt.Printf("%s: %d (%.2f%%)\n", group, count, percentage)
+}
+```
+
+## Best Practices
+
+1. **Limit Time Range** - Keep queries within 6 hours for faster results
+2. **Use Filters** - Apply filters to reduce data volume and improve performance
+3. **Select Fields** - Use the `fields` parameter to return only needed data
+4. **Auto-Paging** - Use `ListAutoPaging` for processing large result sets
+5. **Download for Analysis** - Download logs for complex offline analysis
+6. **Monitor Cache** - Regularly check cache hit rates to optimize performance
+
+## Limitations
+
+- Logs are available for up to 3 days
+- Time range cannot exceed 6 hours per query
+- Results are limited to prevent timeout (use pagination)
+- For historical data or complete logs, use Logs Uploader service
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="CDN Resources" icon="server" href="/api-reference/cdn/resources">
+    Manage CDN resources generating logs
+  </Card>
+  <Card title="Statistics" icon="chart-line" href="/api-reference/cdn/statistics">
+    View aggregated CDN statistics
+  </Card>
+</CardGroup>

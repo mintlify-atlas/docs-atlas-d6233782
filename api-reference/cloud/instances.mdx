@@ -1,0 +1,430 @@
+---
+title: 'Virtual Machine Instances'
+description: 'Create and manage cloud virtual machines with configurable CPU, memory, storage, and networking'
+---
+
+Instances are cloud virtual machines with configurable CPU, memory, storage, and networking, supporting various operating systems and workloads.
+
+## Methods
+
+### New
+
+Create a new instance with specified configuration.
+
+```go
+func (r *InstanceService) New(ctx context.Context, params InstanceNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *InstanceService) NewAndPoll(ctx context.Context, params InstanceNewParams, opts ...option.RequestOption) (*Instance, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="flavor" type="string" required>
+  Instance flavor ID (determines CPU, RAM, disk)
+</ParamField>
+
+<ParamField path="interfaces" type="[]InterfaceUnion" required>
+  Network interfaces configuration. Can be external, subnet, any_subnet, or reserved_fixed_ip
+</ParamField>
+
+<ParamField path="volumes" type="[]VolumeUnion" required>
+  Storage volumes. Can be new-volume, image, snapshot, apptemplate, or existing-volume
+</ParamField>
+
+<ParamField path="name" type="string">
+  Instance name
+</ParamField>
+
+<ParamField path="name_template" type="string">
+  Name template with placeholders: `{ip_octets}`, `{two_ip_octets}`, `{one_ip_octet}`
+</ParamField>
+
+<ParamField path="ssh_key_name" type="string">
+  SSH keypair name for authentication
+</ParamField>
+
+<ParamField path="password" type="string">
+  Password for default user (Linux) or Admin user (Windows)
+</ParamField>
+
+<ParamField path="username" type="string">
+  Username to create (Linux only)
+</ParamField>
+
+<ParamField path="user_data" type="string">
+  Base64-encoded cloud-init script (Linux) or cloudbase-init script (Windows)
+</ParamField>
+
+<ParamField path="security_groups" type="[]SecurityGroup">
+  Security group UUIDs to apply to all interfaces
+</ParamField>
+
+<ParamField path="servergroup_id" type="string">
+  Placement group ID for affinity/anti-affinity policies
+</ParamField>
+
+<ParamField path="tags" type="map[string]string">
+  Key-value tags for resource organization
+</ParamField>
+
+<ParamField path="allow_app_ports" type="bool">
+  Allow application ports in security group (for marketplace templates)
+</ParamField>
+
+<ParamField path="configuration" type="map[string]any">
+  Application template configuration parameters
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Instance UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Instance name
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Instance status: ACTIVE, BUILD, DELETED, ERROR, HARD_REBOOT, MIGRATING, PASSWORD, PAUSED, REBOOT, REBUILD, RESCUE, RESIZE, REVERT_RESIZE, SHELVED, SHELVED_OFFLOADED, SHUTOFF, SOFT_DELETED, SUSPENDED, UNKNOWN, VERIFY_RESIZE
+</ResponseField>
+
+<ResponseField name="flavor" type="InstanceFlavorUnion">
+  Instance flavor details (CPU, RAM, disk)
+</ResponseField>
+
+<ResponseField name="addresses" type="map[string][]Address">
+  Network addresses by network name
+</ResponseField>
+
+<ResponseField name="volumes" type="[]Volume">
+  Attached volumes
+</ResponseField>
+
+<ResponseField name="security_groups" type="[]SecurityGroup">
+  Applied security groups
+</ResponseField>
+
+### Update
+
+Rename instance or update tags.
+
+```go
+func (r *InstanceService) Update(ctx context.Context, instanceID string, params InstanceUpdateParams, opts ...option.RequestOption) (*Instance, error)
+```
+
+<ParamField path="name" type="string">
+  New instance name
+</ParamField>
+
+<ParamField path="tags" type="TagUpdateMap">
+  Tags to add, update, or remove (set to null)
+</ParamField>
+
+### List
+
+List all instances in the project and region.
+
+```go
+func (r *InstanceService) List(ctx context.Context, params InstanceListParams, opts ...option.RequestOption) (*pagination.OffsetPage[Instance], error)
+func (r *InstanceService) ListAutoPaging(ctx context.Context, params InstanceListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[Instance]
+```
+
+<ParamField path="limit" type="int64">
+  Maximum results per page
+</ParamField>
+
+<ParamField path="offset" type="int64">
+  Number of results to skip
+</ParamField>
+
+### Get
+
+Retrieve detailed information about a specific instance.
+
+```go
+func (r *InstanceService) Get(ctx context.Context, instanceID string, query InstanceGetParams, opts ...option.RequestOption) (*Instance, error)
+```
+
+### Delete
+
+Delete an instance.
+
+```go
+func (r *InstanceService) Delete(ctx context.Context, instanceID string, params InstanceDeleteParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *InstanceService) DeleteAndPoll(ctx context.Context, instanceID string, params InstanceDeleteParams, opts ...option.RequestOption) error
+```
+
+### Action
+
+Perform power actions on an instance.
+
+```go
+func (r *InstanceService) Action(ctx context.Context, instanceID string, params InstanceActionParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *InstanceService) ActionAndPoll(ctx context.Context, instanceID string, params InstanceActionParams, opts ...option.RequestOption) (*Instance, error)
+```
+
+<ParamField path="action" type="string" required>
+  Action to perform: start, stop, reboot, powercycle, suspend, resume
+</ParamField>
+
+### Resize
+
+Change the instance flavor (CPU/RAM).
+
+```go
+func (r *InstanceService) Resize(ctx context.Context, instanceID string, params InstanceResizeParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *InstanceService) ResizeAndPoll(ctx context.Context, instanceID string, params InstanceResizeParams, opts ...option.RequestOption) (*Instance, error)
+```
+
+<ParamField path="flavor" type="string" required>
+  New flavor ID
+</ParamField>
+
+### GetConsole
+
+Get instance console URL for remote access.
+
+```go
+func (r *InstanceService) GetConsole(ctx context.Context, instanceID string, params InstanceGetConsoleParams, opts ...option.RequestOption) (*Console, error)
+```
+
+## Sub-Services
+
+### Flavors
+
+Manage available instance flavors (CPU/RAM/disk configurations).
+
+```go
+client.Cloud.Instances.Flavors.List(ctx, params)
+client.Cloud.Instances.Flavors.Get(ctx, flavorID, params)
+```
+
+### Images
+
+Manage operating system images.
+
+```go
+client.Cloud.Instances.Images.List(ctx, params)
+client.Cloud.Instances.Images.Get(ctx, imageID, params)
+client.Cloud.Instances.Images.New(ctx, params) // Create from volume
+```
+
+### Interfaces
+
+Manage network interfaces.
+
+```go
+client.Cloud.Instances.Interfaces.Attach(ctx, instanceID, params)
+client.Cloud.Instances.Interfaces.Detach(ctx, instanceID, portID, params)
+```
+
+### Metrics
+
+Retrieve instance performance metrics.
+
+```go
+client.Cloud.Instances.Metrics.List(ctx, instanceID, params)
+```
+
+## Examples
+
+### Create a Basic Linux Instance
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/shared/constant"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+// Configure network interface (public IP)
+interfaces := []cloud.InstanceNewParamsInterfaceUnion{
+    {OfExternal: &cloud.InstanceNewParamsInterfaceExternal{
+        Type: constant.ValueOf[constant.External](),
+    }},
+}
+
+// Configure boot volume from image
+volumes := []cloud.InstanceNewParamsVolumeUnion{
+    {OfImage: &cloud.InstanceNewParamsVolumeImage{
+        Source:   constant.ValueOf[constant.Image](),
+        ImageID:  "image-uuid",
+        Size:     10, // GB
+        TypeName: "standard",
+    }},
+}
+
+instance, err := client.Cloud.Instances.NewAndPoll(context.Background(), 
+    cloud.InstanceNewParams{
+        Name:       gcore.String("my-instance"),
+        Flavor:     "g1-standard-2-4",
+        Interfaces: interfaces,
+        Volumes:    volumes,
+        SSHKeyName: gcore.String("my-ssh-key"),
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created instance: %s\n", instance.ID)
+```
+
+### Create Instance with Private Network
+
+```go
+interfaces := []cloud.InstanceNewParamsInterfaceUnion{
+    {OfSubnet: &cloud.InstanceNewParamsInterfaceSubnet{
+        Type:      constant.ValueOf[constant.Subnet](),
+        NetworkID: networkID,
+        SubnetID:  subnetID,
+    }},
+}
+
+instance, err := client.Cloud.Instances.NewAndPoll(context.Background(), 
+    cloud.InstanceNewParams{
+        Name:       gcore.String("private-instance"),
+        Flavor:     "g1-standard-2-4",
+        Interfaces: interfaces,
+        Volumes:    volumes,
+    },
+)
+```
+
+### List Instances
+
+```go
+instances, err := client.Cloud.Instances.List(context.Background(), 
+    cloud.InstanceListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, inst := range instances.Results {
+    fmt.Printf("Instance: %s, Status: %s\n", inst.Name, inst.Status)
+}
+```
+
+### Reboot an Instance
+
+```go
+instance, err := client.Cloud.Instances.ActionAndPoll(context.Background(), 
+    instanceID,
+    cloud.InstanceActionParams{
+        OfBasicAction: &cloud.InstanceActionParamsBodyBasicActionInstanceSerializer{
+            Action: "reboot",
+        },
+    },
+)
+```
+
+### Resize Instance
+
+```go
+instance, err := client.Cloud.Instances.ResizeAndPoll(context.Background(), 
+    instanceID,
+    cloud.InstanceResizeParams{
+        Flavor: "g1-standard-4-8", // Upgrade to more CPU/RAM
+    },
+)
+```
+
+### Stop and Start Instance
+
+```go
+// Stop instance
+_, err = client.Cloud.Instances.ActionAndPoll(context.Background(), 
+    instanceID,
+    cloud.InstanceActionParams{
+        OfBasicAction: &cloud.InstanceActionParamsBodyBasicActionInstanceSerializer{
+            Action: "stop",
+        },
+    },
+)
+
+// Start instance
+_, err = client.Cloud.Instances.ActionAndPoll(context.Background(), 
+    instanceID,
+    cloud.InstanceActionParams{
+        OfBasicAction: &cloud.InstanceActionParamsBodyBasicActionInstanceSerializer{
+            Action: "start",
+        },
+    },
+)
+```
+
+### Get Instance Console
+
+```go
+console, err := client.Cloud.Instances.GetConsole(context.Background(), 
+    instanceID,
+    cloud.InstanceGetConsoleParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Console URL: %s\n", console.RemoteConsole.URL)
+```
+
+### Delete Instance
+
+```go
+err := client.Cloud.Instances.DeleteAndPoll(context.Background(), 
+    instanceID,
+    cloud.InstanceDeleteParams{},
+)
+```
+
+## Common Use Cases
+
+### Create Instance with Cloud-Init
+
+```go
+import "encoding/base64"
+
+cloudInitScript := `#cloud-config
+packages:
+  - nginx
+  - git
+runcmd:
+  - systemctl start nginx
+  - systemctl enable nginx
+`
+
+instance, err := client.Cloud.Instances.NewAndPoll(context.Background(), 
+    cloud.InstanceNewParams{
+        Name:       gcore.String("web-server"),
+        Flavor:     "g1-standard-2-4",
+        Interfaces: interfaces,
+        Volumes:    volumes,
+        UserData:   gcore.String(base64.StdEncoding.EncodeToString([]byte(cloudInitScript))),
+    },
+)
+```
+
+### Create Instance in Placement Group
+
+```go
+instance, err := client.Cloud.Instances.NewAndPoll(context.Background(), 
+    cloud.InstanceNewParams{
+        Name:          gcore.String("app-server-1"),
+        Flavor:        "g1-standard-2-4",
+        Interfaces:    interfaces,
+        Volumes:       volumes,
+        ServergroupID: gcore.String(placementGroupID), // Anti-affinity
+    },
+)
+```

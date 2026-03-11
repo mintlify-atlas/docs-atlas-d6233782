@@ -1,0 +1,114 @@
+---
+title: "Middleware"
+description: "Learn how to use middleware to intercept and modify HTTP requests in the Gcore Go SDK"
+---
+
+## Overview
+
+The SDK provides `option.WithMiddleware` which applies the given middleware to requests. Middleware allows you to intercept requests before they're sent and responses after they're received.
+
+## Creating Middleware
+
+Middleware is a function that receives an HTTP request and a next handler, and returns a response and error.
+
+### Basic Middleware Example
+
+```go
+func Logger(req *http.Request, next option.MiddlewareNext) (res *http.Response, err error) {
+	// Before the request
+	start := time.Now()
+	LogReq(req)
+
+	// Forward the request to the next handler
+	res, err = next(req)
+
+	// Handle stuff after the request
+	end := time.Now()
+	LogRes(res, err, start - end)
+
+    return res, err
+}
+```
+
+## Applying Middleware
+
+Middleware can be applied at the client level or per-request.
+
+### Client-Level Middleware
+
+```go
+client := gcore.NewClient(
+	option.WithMiddleware(Logger),
+)
+```
+
+### Per-Request Middleware
+
+You can also apply middleware to individual requests:
+
+```go
+client.Cloud.Projects.New(
+	context.TODO(),
+	cloud.ProjectNewParams{
+		Name: "my-project",
+	},
+	option.WithMiddleware(CustomMiddleware),
+)
+```
+
+## Middleware Execution Order
+
+<Info>
+When multiple middlewares are provided as variadic arguments, the middlewares are applied left to right.
+</Info>
+
+If `option.WithMiddleware` is given multiple times, for example first in the client then the method, the middleware in the client will run first and the middleware given in the method will run next.
+
+### Multiple Middleware Example
+
+```go
+client := gcore.NewClient(
+	option.WithMiddleware(Logger, Authentication, RateLimiter),
+)
+```
+
+Execution order:
+1. Logger (before request)
+2. Authentication (before request)
+3. RateLimiter (before request)
+4. Actual HTTP request
+5. RateLimiter (after response)
+6. Authentication (after response)
+7. Logger (after response)
+
+## Custom HTTP Client
+
+<Note>
+You may also replace the default `http.Client` with `option.WithHTTPClient(client)`.
+</Note>
+
+Only one HTTP client is accepted (this overwrites any previous client) and receives requests after any middleware has been applied.
+
+```go
+customHTTPClient := &http.Client{
+	Timeout: 30 * time.Second,
+	Transport: &http.Transport{
+		MaxIdleConns: 100,
+	},
+}
+
+client := gcore.NewClient(
+	option.WithHTTPClient(customHTTPClient),
+)
+```
+
+## Use Cases
+
+Middleware is useful for:
+- **Logging**: Track request/response details and timing
+- **Authentication**: Add custom authentication headers
+- **Rate limiting**: Implement client-side rate limiting
+- **Retry logic**: Implement custom retry strategies
+- **Monitoring**: Send metrics to monitoring services
+- **Request modification**: Modify requests before they're sent
+- **Response transformation**: Transform responses before they're returned

@@ -1,0 +1,469 @@
+---
+title: "SSL Certificates"
+description: "Manage SSL/TLS certificates for HTTPS content delivery"
+---
+
+CDN SSL certificates enable secure HTTPS content delivery. You can upload your own certificates or use automated Let's Encrypt provisioning.
+
+## Add SSL Certificate
+
+Add an SSL certificate for HTTPS content delivery.
+
+### Upload Your Own Certificate
+
+```go
+import (
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+)
+
+params := cdn.CertificateNewParams{
+    OfOwnCertificate: &cdn.CertificateNewParamsBodyOwnCertificate{
+        Name:           "My SSL Certificate",
+        SslCertificate: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
+        SslPrivateKey:  "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+        ValidateRootCa: gcore.Bool(true),
+    },
+}
+
+err := client.CDN.Certificates.New(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Certificate added successfully")
+```
+
+<ParamField path="name" type="string" required>
+  Unique certificate name for identification
+</ParamField>
+
+<ParamField path="ssl_certificate" type="string" required>
+  Public part of the SSL certificate. Include the full certificate chain separated by `\n`
+</ParamField>
+
+<ParamField path="ssl_private_key" type="string" required>
+  Private key of the SSL certificate
+</ParamField>
+
+<ParamField path="validate_root_ca" type="boolean">
+  Whether to verify the certificate is signed by a trusted certificate authority. Default: `true`
+</ParamField>
+
+### Request Let's Encrypt Certificate
+
+```go
+params := cdn.CertificateNewParams{
+    OfLetSEncryptCertificate: &cdn.CertificateNewParamsBodyLetSEncryptCertificate{
+        Automated: true,
+        Name:      "LE Certificate for cdn.example.com",
+    },
+}
+
+err := client.CDN.Certificates.New(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+```
+
+<ParamField path="automated" type="boolean" required>
+  Must be `true` to issue a Let's Encrypt certificate automatically
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Unique certificate name
+</ParamField>
+
+<Note>
+  After attaching a Let's Encrypt certificate to your CDN resource, the certificate and private key are generated automatically. This can take up to 15 minutes.
+</Note>
+
+## Get SSL Certificate
+
+Retrieve details of a specific SSL certificate.
+
+```go
+cert, err := client.CDN.Certificates.Get(context.Background(), sslID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Certificate: %s\n", cert.Name)
+fmt.Printf("Issuer: %s\n", cert.CertIssuer)
+fmt.Printf("Valid from: %s to %s\n", cert.ValidityNotBefore, cert.ValidityNotAfter)
+```
+
+<ResponseField name="id" type="int64">
+  SSL certificate ID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Certificate name
+</ResponseField>
+
+<ResponseField name="automated" type="boolean">
+  Whether the certificate was issued automatically via Let's Encrypt
+</ResponseField>
+
+<ResponseField name="cert_issuer" type="string">
+  Name of the certificate authority that issued the certificate
+</ResponseField>
+
+<ResponseField name="cert_subject_cn" type="string">
+  Primary domain name secured by the certificate
+</ResponseField>
+
+<ResponseField name="cert_subject_alt" type="string">
+  Alternative domain names secured by the certificate (Subject Alternative Names)
+</ResponseField>
+
+<ResponseField name="validity_not_before" type="string">
+  Date when certificate becomes valid (ISO 8601 format, UTC)
+</ResponseField>
+
+<ResponseField name="validity_not_after" type="string">
+  Date when certificate expires (ISO 8601 format, UTC)
+</ResponseField>
+
+<ResponseField name="has_related_resources" type="boolean">
+  Whether the certificate is currently used by any CDN resources
+</ResponseField>
+
+## List SSL Certificates
+
+Get all SSL certificates in your account.
+
+```go
+params := cdn.CertificateListParams{
+    Automated:  gcore.Bool(false), // Only show uploaded certificates
+    ResourceID: gcore.Int(resourceID), // Certificates for specific resource
+}
+
+certs, err := client.CDN.Certificates.List(context.Background(), params)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, cert := range *certs {
+    fmt.Printf("%s - Expires: %s\n", cert.Name, cert.ValidityNotAfter)
+}
+```
+
+<ParamField path="automated" type="boolean">
+  Filter by certificate type:
+  - `true` - Only Let's Encrypt certificates
+  - `false` - Only uploaded certificates
+</ParamField>
+
+<ParamField path="resource_id" type="int64">
+  Filter by CDN resource ID to show certificates attached to a specific resource
+</ParamField>
+
+<ParamField path="validity_not_after_lte" type="string">
+  Return only certificates valid until the specified date (ISO 8601 format, UTC)
+</ParamField>
+
+## Update SSL Certificate
+
+Replace an existing SSL certificate with a new one.
+
+```go
+params := cdn.CertificateReplaceParams{
+    Name:           "Updated Certificate",
+    SslCertificate: "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----\n",
+    SslPrivateKey:  "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n",
+    ValidateRootCa: gcore.Bool(true),
+}
+
+cert, err := client.CDN.Certificates.Replace(context.Background(), sslID, params)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Certificate updated: %s\n", cert.Name)
+```
+
+## Delete SSL Certificate
+
+Delete an SSL certificate from the system.
+
+```go
+err := client.CDN.Certificates.Delete(context.Background(), sslID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Certificate deleted")
+```
+
+<Warning>
+  You cannot delete a certificate that is currently attached to a CDN resource. Detach it from all resources first.
+</Warning>
+
+## Let's Encrypt Operations
+
+### Get Certificate Status
+
+Get the status of a Let's Encrypt certificate issuance attempt.
+
+```go
+status, err := client.CDN.Certificates.GetStatus(
+    context.Background(),
+    certID,
+    cdn.CertificateGetStatusParams{
+        Exclude: []string{"statuses"}, // Optional: exclude detailed status history
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Active: %v\n", status.Active)
+fmt.Printf("Latest Status: %s\n", status.LatestStatus.Status)
+if status.LatestStatus.Error != "" {
+    fmt.Printf("Error: %s - %s\n", status.LatestStatus.Error, status.LatestStatus.Details)
+}
+```
+
+<ResponseField name="id" type="int64">
+  Certificate issuance attempt ID
+</ResponseField>
+
+<ResponseField name="resource" type="int64">
+  CDN resource ID
+</ResponseField>
+
+<ResponseField name="active" type="boolean">
+  Whether the issuance process is active
+</ResponseField>
+
+<ResponseField name="started" type="string">
+  When the issuance process started (ISO 8601 format, UTC)
+</ResponseField>
+
+<ResponseField name="finished" type="string">
+  When the issuance process finished (ISO 8601 format, UTC). Null if still in progress
+</ResponseField>
+
+<ResponseField name="attempts_count" type="int64">
+  Number of issuance attempts made
+</ResponseField>
+
+<ResponseField name="next_attempt_time" type="string">
+  Scheduled time for next attempt (ISO 8601 format, UTC)
+</ResponseField>
+
+<ResponseField name="latest_status" type="object">
+  Status of the most recent attempt
+  <Expandable title="properties">
+    <ResponseField name="status" type="string">
+      Attempt status: `Done`, `Failed`, or `Cancelled`
+    </ResponseField>
+    <ResponseField name="error" type="string">
+      Brief error description if the attempt failed
+    </ResponseField>
+    <ResponseField name="details" type="string">
+      Detailed error information
+    </ResponseField>
+    <ResponseField name="retry_after" type="string">
+      Date when rate limit is lifted (only present if error is RateLimited)
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+### Renew Let's Encrypt Certificate
+
+Manually renew a Let's Encrypt certificate.
+
+```go
+err := client.CDN.Certificates.Renew(context.Background(), certID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Certificate renewal initiated")
+```
+
+<Note>
+  Let's Encrypt certificates are automatically renewed before expiration. Manual renewal is rarely needed. The process can take up to 15 minutes.
+</Note>
+
+### Force Retry Issuance
+
+Retry Let's Encrypt certificate issuance if a previous attempt failed.
+
+```go
+err := client.CDN.Certificates.ForceRetry(context.Background(), certID)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("Certificate issuance retry initiated")
+```
+
+## Attach Certificate to CDN Resource
+
+To use an SSL certificate with a CDN resource:
+
+```go
+// First, enable SSL and attach the certificate
+params := cdn.CDNResourceUpdateParams{
+    SslEnabled: param.NewOpt(true),
+    SslData:    param.NewOpt[int64](sslID),
+}
+
+resource, err := client.CDN.CDNResources.Update(
+    context.Background(),
+    resourceID,
+    params,
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Println("HTTPS enabled with certificate")
+```
+
+## Certificate Validation
+
+### Prevalidate Let's Encrypt Certificate
+
+Before requesting a Let's Encrypt certificate, verify it can be issued:
+
+```go
+err := client.CDN.CDNResources.PrevalidateSslLeCertificate(
+    context.Background(),
+    resourceID,
+)
+if err != nil {
+    log.Printf("Certificate validation failed: %v", err)
+} else {
+    fmt.Println("Certificate can be issued")
+}
+```
+
+## Complete Example
+
+```go
+package main
+
+import (
+    "context"
+    "fmt"
+    "log"
+    "time"
+
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cdn"
+    "github.com/G-Core/gcore-go/packages/param"
+)
+
+func main() {
+    client := gcore.NewClient()
+
+    // Add Let's Encrypt certificate
+    certParams := cdn.CertificateNewParams{
+        OfLetSEncryptCertificate: &cdn.CertificateNewParamsBodyLetSEncryptCertificate{
+            Automated: true,
+            Name:      fmt.Sprintf("LE-cert-%d", time.Now().Unix()),
+        },
+    }
+
+    err := client.CDN.Certificates.New(context.Background(), certParams)
+    if err != nil {
+        log.Fatalf("Error adding certificate: %v", err)
+    }
+
+    // List certificates to get the ID
+    certs, err := client.CDN.Certificates.List(
+        context.Background(),
+        cdn.CertificateListParams{Automated: gcore.Bool(true)},
+    )
+    if err != nil {
+        log.Fatalf("Error listing certificates: %v", err)
+    }
+
+    if len(*certs) == 0 {
+        log.Fatal("No certificates found")
+    }
+
+    certID := (*certs)[0].ID
+
+    // Enable HTTPS on CDN resource
+    updateParams := cdn.CDNResourceUpdateParams{
+        SslEnabled: param.NewOpt(true),
+        SslData:    param.NewOpt(certID),
+    }
+
+    resource, err := client.CDN.CDNResources.Update(
+        context.Background(),
+        resourceID,
+        updateParams,
+    )
+    if err != nil {
+        log.Fatalf("Error enabling HTTPS: %v", err)
+    }
+
+    fmt.Printf("HTTPS enabled on resource %d\n", resource.ID)
+
+    // Check certificate status
+    status, err := client.CDN.Certificates.GetStatus(
+        context.Background(),
+        certID,
+        cdn.CertificateGetStatusParams{},
+    )
+    if err != nil {
+        log.Fatalf("Error checking status: %v", err)
+    }
+
+    fmt.Printf("Certificate issuance active: %v\n", status.Active)
+    fmt.Printf("Latest status: %s\n", status.LatestStatus.Status)
+}
+```
+
+## Best Practices
+
+1. **Use Let's Encrypt** - Automated certificate management with free renewals
+2. **Monitor Expiration** - Check certificate expiration dates regularly
+3. **Test First** - Use prevalidation before requesting Let's Encrypt certificates
+4. **Plan Renewals** - Renew certificates well before expiration
+5. **Keep Backups** - Store uploaded certificate backups securely
+
+## Troubleshooting
+
+### Let's Encrypt Issuance Failed
+
+Check the certificate status for detailed error information:
+
+```go
+status, _ := client.CDN.Certificates.GetStatus(
+    context.Background(),
+    certID,
+    cdn.CertificateGetStatusParams{},
+)
+
+if status.LatestStatus.Error != "" {
+    fmt.Printf("Error: %s\n", status.LatestStatus.Error)
+    fmt.Printf("Details: %s\n", status.LatestStatus.Details)
+    
+    if status.LatestStatus.Error == "RateLimited" {
+        fmt.Printf("Retry after: %s\n", status.LatestStatus.RetryAfter)
+    }
+}
+```
+
+Common issues:
+- **Domain validation failed** - Ensure DNS points to CDN servers
+- **Rate limited** - Wait until the retry_after date
+- **Invalid configuration** - Check CDN resource settings
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="CDN Resources" icon="server" href="/api-reference/cdn/resources">
+    Manage CDN resources and enable HTTPS
+  </Card>
+  <Card title="Resource Rules" icon="list-check" href="/api-reference/cdn/rules">
+    Configure HTTPS-specific delivery rules
+  </Card>
+</CardGroup>

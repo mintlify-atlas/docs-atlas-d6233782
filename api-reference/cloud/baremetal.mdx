@@ -1,0 +1,479 @@
+---
+title: 'Bare Metal Servers'
+description: 'Deploy and manage dedicated bare metal servers with direct hardware access'
+---
+
+Bare metal servers provide dedicated physical servers with direct hardware access, ideal for high-performance workloads and compliance requirements.
+
+## Service Structure
+
+The Baremetal service includes sub-services for managing servers, images, and flavors:
+
+```go
+client.Cloud.Baremetal.Servers  // Bare metal server management
+client.Cloud.Baremetal.Images   // Bare metal-compatible images
+client.Cloud.Baremetal.Flavors  // Available hardware configurations
+```
+
+## Server Management
+
+### New
+
+Create a new bare metal server.
+
+```go
+func (r *BaremetalServerService) New(ctx context.Context, params BaremetalServerNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="flavor" type="string" required>
+  Bare metal flavor ID (hardware configuration)
+</ParamField>
+
+<ParamField path="interfaces" type="[]InterfaceUnion" required>
+  Network interface configurations
+</ParamField>
+
+<ParamField path="image_id" type="string" required>
+  Bare metal-compatible image ID
+</ParamField>
+
+<ParamField path="name" type="string">
+  Server name
+</ParamField>
+
+<ParamField path="ssh_key_name" type="string">
+  SSH keypair name
+</ParamField>
+
+<ParamField path="password" type="string">
+  Password for default user (Linux) or Admin (Windows)
+</ParamField>
+
+<ParamField path="username" type="string">
+  Username to create (Linux only)
+</ParamField>
+
+<ParamField path="user_data" type="string">
+  Base64-encoded cloud-init or cloudbase-init script
+</ParamField>
+
+<ParamField path="tags" type="map[string]string">
+  Key-value tags
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Server UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Server name
+</ResponseField>
+
+<ResponseField name="status" type="string">
+  Server status: ACTIVE, BUILD, ERROR, SHUTOFF, etc.
+</ResponseField>
+
+<ResponseField name="flavor" type="BaremetalFlavor">
+  Hardware configuration details
+</ResponseField>
+
+<ResponseField name="addresses" type="map[string][]Address">
+  Network addresses by network name
+</ResponseField>
+
+<Info>
+  Bare metal servers do not support certain features available for VMs:
+  - Server groups / placement groups
+  - Suspend/resume operations
+  - Live migration
+</Info>
+
+### List
+
+List all bare metal servers.
+
+```go
+func (r *BaremetalServerService) List(ctx context.Context, params BaremetalServerListParams, opts ...option.RequestOption) (*pagination.OffsetPage[BaremetalServer], error)
+func (r *BaremetalServerService) ListAutoPaging(ctx context.Context, params BaremetalServerListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[BaremetalServer]
+```
+
+### Rebuild
+
+Rebuild a server with a new image.
+
+```go
+func (r *BaremetalServerService) Rebuild(ctx context.Context, serverID string, params BaremetalServerRebuildParams, opts ...option.RequestOption) (*TaskIDList, error)
+```
+
+<ParamField path="image_id" type="string" required>
+  New image ID to install
+</ParamField>
+
+<ParamField path="password" type="string">
+  New password
+</ParamField>
+
+<ParamField path="username" type="string">
+  New username (Linux only)
+</ParamField>
+
+## Flavors
+
+List available bare metal hardware configurations.
+
+### List Flavors
+
+```go
+func (r *BaremetalFlavorService) List(ctx context.Context, params BaremetalFlavorListParams, opts ...option.RequestOption) (*BaremetalFlavorList, error)
+```
+
+<ParamField path="include_prices" type="bool">
+  Include pricing information in response
+</ParamField>
+
+<ResponseField name="flavor_id" type="string">
+  Flavor identifier
+</ResponseField>
+
+<ResponseField name="flavor_name" type="string">
+  Human-readable flavor name
+</ResponseField>
+
+<ResponseField name="vcpus" type="int64">
+  Physical CPU core count
+</ResponseField>
+
+<ResponseField name="ram" type="int64">
+  RAM size in MiB
+</ResponseField>
+
+<ResponseField name="architecture" type="string">
+  CPU architecture
+</ResponseField>
+
+<ResponseField name="hardware_description" type="map[string]string">
+  Detailed hardware specifications (CPU, disk, network, etc.)
+</ResponseField>
+
+<ResponseField name="capacity" type="int64">
+  Number of available servers with this configuration
+</ResponseField>
+
+## Images
+
+Manage bare metal-compatible operating system images.
+
+### List Images
+
+```go
+func (r *BaremetalImageService) List(ctx context.Context, params BaremetalImageListParams, opts ...option.RequestOption) (*GPUImageList, error)
+```
+
+<ResponseField name="id" type="string">
+  Image UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Image name
+</ResponseField>
+
+<ResponseField name="os_distro" type="string">
+  OS distribution (Ubuntu, Debian, CentOS, etc.)
+</ResponseField>
+
+<ResponseField name="os_version" type="string">
+  OS version
+</ResponseField>
+
+<ResponseField name="architecture" type="string">
+  Image architecture (x86_64, aarch64)
+</ResponseField>
+
+## Examples
+
+### Create a Bare Metal Server
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/shared/constant"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+// Configure network interface
+interfaces := []cloud.BaremetalServerNewParamsInterfaceUnion{
+    {OfExternal: &cloud.BaremetalServerNewParamsInterfaceExternal{
+        Type: constant.ValueOf[constant.External](),
+    }},
+}
+
+// Create bare metal server
+tasks, err := client.Cloud.Baremetal.Servers.New(context.Background(), 
+    cloud.BaremetalServerNewParams{
+        Name:       gcore.String("database-server"),
+        Flavor:     "bm-high-cpu-32-64",
+        ImageID:    "baremetal-ubuntu-22.04",
+        Interfaces: interfaces,
+        SSHKeyName: gcore.String("my-ssh-key"),
+        Tags:       map[string]string{"role": "database"},
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Creating bare metal server (task: %s)\n", tasks.Tasks[0])
+```
+
+### List Available Bare Metal Flavors
+
+```go
+flavors, err := client.Cloud.Baremetal.Flavors.List(context.Background(), 
+    cloud.BaremetalFlavorListParams{
+        IncludePrices: gcore.Bool(true),
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, flavor := range flavors.Results {
+    fmt.Printf("Flavor: %s\n", flavor.FlavorName)
+    fmt.Printf("  CPUs: %d, RAM: %d MiB\n", flavor.Vcpus, flavor.Ram)
+    fmt.Printf("  Architecture: %s\n", flavor.Architecture)
+    fmt.Printf("  Available: %d servers\n", flavor.Capacity)
+    
+    if flavor.HardwareDescription != nil {
+        for key, value := range flavor.HardwareDescription {
+            fmt.Printf("  %s: %s\n", key, value)
+        }
+    }
+    
+    if flavor.PricePerMonth > 0 {
+        fmt.Printf("  Price: $%.2f/month\n", flavor.PricePerMonth)
+    }
+    fmt.Println()
+}
+```
+
+### List Bare Metal Images
+
+```go
+images, err := client.Cloud.Baremetal.Images.List(context.Background(), 
+    cloud.BaremetalImageListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, image := range images.Results {
+    fmt.Printf("Image: %s\n", image.Name)
+    fmt.Printf("  OS: %s %s\n", image.OsDistro, image.OsVersion)
+    fmt.Printf("  Architecture: %s\n", image.Architecture)
+}
+```
+
+### List Bare Metal Servers
+
+```go
+servers, err := client.Cloud.Baremetal.Servers.List(context.Background(), 
+    cloud.BaremetalServerListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, server := range servers.Results {
+    fmt.Printf("Server: %s, Status: %s\n", server.Name, server.Status)
+    fmt.Printf("  Flavor: %s\n", server.Flavor.FlavorName)
+    fmt.Printf("  CPUs: %d, RAM: %d GB\n", 
+        server.Flavor.Vcpus, server.Flavor.Ram/1024)
+}
+```
+
+### Rebuild Bare Metal Server
+
+```go
+tasks, err := client.Cloud.Baremetal.Servers.Rebuild(context.Background(), 
+    serverID,
+    cloud.BaremetalServerRebuildParams{
+        ImageID:  "new-image-id",
+        Password: gcore.String("new-secure-password"),
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Rebuilding server (task: %s)\n", tasks.Tasks[0])
+```
+
+## Common Use Cases
+
+### High-Performance Database Server
+
+```go
+import "encoding/base64"
+
+// Prepare cloud-init script
+cloudInit := `#cloud-config
+packages:
+  - postgresql-14
+  - redis-server
+runcmd:
+  - systemctl start postgresql
+  - systemctl enable postgresql
+`
+
+interfaces := []cloud.BaremetalServerNewParamsInterfaceUnion{
+    {OfSubnet: &cloud.BaremetalServerNewParamsInterfaceSubnet{
+        Type:      constant.ValueOf[constant.Subnet](),
+        NetworkID: networkID,
+        SubnetID:  subnetID,
+    }},
+}
+
+server, err := client.Cloud.Baremetal.Servers.New(context.Background(), 
+    cloud.BaremetalServerNewParams{
+        Name:       gcore.String("postgres-baremetal"),
+        Flavor:     "bm-high-memory-32-256",
+        ImageID:    "ubuntu-22.04-baremetal",
+        Interfaces: interfaces,
+        SSHKeyName: gcore.String("db-admin-key"),
+        UserData:   gcore.String(base64.StdEncoding.EncodeToString([]byte(cloudInit))),
+        Tags:       map[string]string{
+            "database": "postgresql",
+            "tier": "storage",
+        },
+    },
+)
+```
+
+### Check Flavor Availability
+
+```go
+flavors, err := client.Cloud.Baremetal.Flavors.List(context.Background(), 
+    cloud.BaremetalFlavorListParams{},
+)
+
+for _, flavor := range flavors.Results {
+    if flavor.Capacity > 0 {
+        fmt.Printf("Available: %s (%d servers)\n", 
+            flavor.FlavorName, flavor.Capacity)
+    }
+}
+```
+
+### Create Server with Reserved Capacity
+
+```go
+// Check for reserved capacity
+flavors, _ := client.Cloud.Baremetal.Flavors.List(context.Background(), 
+    cloud.BaremetalFlavorListParams{},
+)
+
+for _, flavor := range flavors.Results {
+    if flavor.ReservedCapacity > 0 {
+        fmt.Printf("Reserved capacity: %s (%d)\n", 
+            flavor.FlavorName, flavor.ReservedCapacity)
+        
+        // Create server from reserved capacity
+        server, _ := client.Cloud.Baremetal.Servers.New(context.Background(), 
+            cloud.BaremetalServerNewParams{
+                Flavor:     flavor.FlavorID,
+                ImageID:    imageID,
+                Interfaces: interfaces,
+                // ... other params
+            },
+        )
+    }
+}
+```
+
+## Differences from Virtual Instances
+
+Bare metal servers differ from virtual instances in several ways:
+
+<Warning>
+  **Not Supported:**
+  - Server groups / placement groups
+  - Suspend and resume operations
+  - Live migration
+  - Hot-add resources (CPU/RAM)
+  - Flavor changes without rebuild
+</Warning>
+
+<Info>
+  **Advantages:**
+  - Dedicated physical hardware
+  - No hypervisor overhead
+  - Consistent performance
+  - Full access to hardware features
+  - Ideal for compliance requirements
+</Info>
+
+## Access Configuration
+
+### Linux Servers
+
+```go
+// Option 1: SSH key only
+server, _ := client.Cloud.Baremetal.Servers.New(context.Background(), 
+    cloud.BaremetalServerNewParams{
+        // ...
+        SSHKeyName: gcore.String("my-key"),
+    },
+)
+
+// Option 2: Create user with password
+server, _ := client.Cloud.Baremetal.Servers.New(context.Background(), 
+    cloud.BaremetalServerNewParams{
+        // ...
+        Username: gcore.String("admin"),
+        Password: gcore.String("SecurePass123!"),
+    },
+)
+
+// Option 3: Cloud-init script
+cloudInit := `#cloud-config
+users:
+  - name: deploy
+    ssh_authorized_keys:
+      - ssh-rsa AAAA...
+    sudo: ALL=(ALL) NOPASSWD:ALL
+`
+server, _ := client.Cloud.Baremetal.Servers.New(context.Background(), 
+    cloud.BaremetalServerNewParams{
+        // ...
+        UserData: gcore.String(base64.StdEncoding.EncodeToString([]byte(cloudInit))),
+    },
+)
+```
+
+### Windows Servers
+
+```go
+// Set Admin password
+server, _ := client.Cloud.Baremetal.Servers.New(context.Background(), 
+    cloud.BaremetalServerNewParams{
+        // ...
+        ImageID:  "windows-server-2022-baremetal",
+        Password: gcore.String("AdminPass123!"),
+    },
+)
+```

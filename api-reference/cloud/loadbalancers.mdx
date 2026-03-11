@@ -1,0 +1,488 @@
+---
+title: 'Load Balancers'
+description: 'Distribute incoming traffic across multiple instances with health monitoring'
+---
+
+Load balancers distribute incoming traffic across multiple instances with support for listeners, pools, and health monitoring.
+
+## Methods
+
+### New
+
+Create a new load balancer.
+
+```go
+func (r *LoadBalancerService) New(ctx context.Context, params LoadBalancerNewParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *LoadBalancerService) NewAndPoll(ctx context.Context, params LoadBalancerNewParams, opts ...option.RequestOption) (*LoadBalancer, error)
+```
+
+<ParamField path="project_id" type="int64" required>
+  Project ID
+</ParamField>
+
+<ParamField path="region_id" type="int64" required>
+  Region ID
+</ParamField>
+
+<ParamField path="name" type="string" required>
+  Load balancer name
+</ParamField>
+
+<ParamField path="flavor" type="string">
+  Load balancer flavor ID (determines capacity)
+</ParamField>
+
+<ParamField path="listeners" type="[]Listener">
+  Initial listener configurations
+</ParamField>
+
+<ParamField path="vip_network_id" type="string">
+  Network ID for the VIP (virtual IP)
+</ParamField>
+
+<ParamField path="vip_subnet_id" type="string">
+  Subnet ID for the VIP
+</ParamField>
+
+<ParamField path="tags" type="map[string]string">
+  Key-value tags
+</ParamField>
+
+<ResponseField name="id" type="string">
+  Load balancer UUID
+</ResponseField>
+
+<ResponseField name="name" type="string">
+  Load balancer name
+</ResponseField>
+
+<ResponseField name="vip_address" type="string">
+  Virtual IP address
+</ResponseField>
+
+<ResponseField name="operating_status" type="string">
+  Operating status: ONLINE, OFFLINE, DEGRADED, ERROR, NO_MONITOR
+</ResponseField>
+
+<ResponseField name="provisioning_status" type="string">
+  Provisioning status: ACTIVE, PENDING_CREATE, PENDING_UPDATE, PENDING_DELETE, ERROR
+</ResponseField>
+
+<ResponseField name="listeners" type="[]Listener">
+  Configured listeners
+</ResponseField>
+
+### Update
+
+Update load balancer properties (deprecated, use PATCH v2 endpoint).
+
+```go
+func (r *LoadBalancerService) Update(ctx context.Context, loadBalancerID string, params LoadBalancerUpdateParams, opts ...option.RequestOption) (*LoadBalancer, error)
+```
+
+### List
+
+List all load balancers.
+
+```go
+func (r *LoadBalancerService) List(ctx context.Context, params LoadBalancerListParams, opts ...option.RequestOption) (*pagination.OffsetPage[LoadBalancer], error)
+func (r *LoadBalancerService) ListAutoPaging(ctx context.Context, params LoadBalancerListParams, opts ...option.RequestOption) *pagination.OffsetPageAutoPager[LoadBalancer]
+```
+
+### Get
+
+Get load balancer details.
+
+```go
+func (r *LoadBalancerService) Get(ctx context.Context, loadBalancerID string, params LoadBalancerGetParams, opts ...option.RequestOption) (*LoadBalancer, error)
+```
+
+### Delete
+
+Delete a load balancer.
+
+```go
+func (r *LoadBalancerService) Delete(ctx context.Context, loadBalancerID string, body LoadBalancerDeleteParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *LoadBalancerService) DeleteAndPoll(ctx context.Context, loadBalancerID string, params LoadBalancerDeleteParams, opts ...option.RequestOption) error
+```
+
+### Resize
+
+Change the load balancer flavor.
+
+```go
+func (r *LoadBalancerService) Resize(ctx context.Context, loadBalancerID string, params LoadBalancerResizeParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *LoadBalancerService) ResizeAndPoll(ctx context.Context, loadBalancerID string, params LoadBalancerResizeParams, opts ...option.RequestOption) (*LoadBalancer, error)
+```
+
+<ParamField path="flavor" type="string" required>
+  New flavor ID
+</ParamField>
+
+### Failover
+
+Trigger failover for high-availability load balancers.
+
+```go
+func (r *LoadBalancerService) Failover(ctx context.Context, loadBalancerID string, params LoadBalancerFailoverParams, opts ...option.RequestOption) (*TaskIDList, error)
+func (r *LoadBalancerService) FailoverAndPoll(ctx context.Context, loadBalancerID string, params LoadBalancerFailoverParams, opts ...option.RequestOption) (*LoadBalancer, error)
+```
+
+## Sub-Services
+
+### Listeners
+
+Manage load balancer listeners that handle incoming traffic.
+
+```go
+client.Cloud.LoadBalancers.Listeners.New(ctx, params)
+client.Cloud.LoadBalancers.Listeners.List(ctx, params)
+client.Cloud.LoadBalancers.Listeners.Get(ctx, listenerID, params)
+client.Cloud.LoadBalancers.Listeners.Update(ctx, listenerID, params)
+client.Cloud.LoadBalancers.Listeners.Delete(ctx, listenerID, params)
+```
+
+**Listener Properties:**
+- `protocol`: HTTP, HTTPS, TCP, UDP, TERMINATED_HTTPS, PROMETHEUS
+- `protocol_port`: Port number (1-65535)
+- `connection_limit`: Max simultaneous connections
+- `allowed_cidrs`: Network CIDRs allowed to connect
+- `secret_id`: TLS certificate for TERMINATED_HTTPS
+
+### Pools
+
+Manage backend server pools.
+
+```go
+client.Cloud.LoadBalancers.Pools.New(ctx, params)
+client.Cloud.LoadBalancers.Pools.List(ctx, params)
+client.Cloud.LoadBalancers.Pools.Get(ctx, poolID, params)
+client.Cloud.LoadBalancers.Pools.Update(ctx, poolID, params)
+client.Cloud.LoadBalancers.Pools.Delete(ctx, poolID, params)
+```
+
+**Pool Properties:**
+- `lb_algorithm`: ROUND_ROBIN, LEAST_CONNECTIONS, SOURCE_IP
+- `protocol`: HTTP, HTTPS, TCP, UDP, PROXY, PROXYV2
+- `session_persistence`: Cookie or source IP based
+- `health_monitor`: Health check configuration
+
+### Pool Members
+
+Manage backend servers in a pool.
+
+```go
+client.Cloud.LoadBalancers.Pools.Members.New(ctx, poolID, params)
+client.Cloud.LoadBalancers.Pools.Members.List(ctx, poolID, params)
+client.Cloud.LoadBalancers.Pools.Members.Get(ctx, poolID, memberID, params)
+client.Cloud.LoadBalancers.Pools.Members.Update(ctx, poolID, memberID, params)
+client.Cloud.LoadBalancers.Pools.Members.Delete(ctx, poolID, memberID, params)
+```
+
+### Health Monitors
+
+Manage pool health checks.
+
+```go
+client.Cloud.LoadBalancers.Pools.HealthMonitors.New(ctx, poolID, params)
+client.Cloud.LoadBalancers.Pools.HealthMonitors.Get(ctx, poolID, params)
+client.Cloud.LoadBalancers.Pools.HealthMonitors.Update(ctx, poolID, healthMonitorID, params)
+client.Cloud.LoadBalancers.Pools.HealthMonitors.Delete(ctx, poolID, healthMonitorID, params)
+```
+
+**Health Monitor Types:**
+- `HTTP/HTTPS`: Check HTTP response codes
+- `TCP`: Check TCP connection
+- `PING`: ICMP ping check
+- `TLS-HELLO`: TLS handshake check
+- `UDP-CONNECT`: UDP connection check
+
+### Metrics
+
+Retrieve load balancer performance metrics.
+
+```go
+client.Cloud.LoadBalancers.Metrics.List(ctx, loadBalancerID, params)
+```
+
+### Statuses
+
+Get detailed status tree of load balancer components.
+
+```go
+client.Cloud.LoadBalancers.Statuses.Get(ctx, loadBalancerID, params)
+```
+
+## Examples
+
+### Create HTTP Load Balancer
+
+```go
+import (
+    "context"
+    "github.com/G-Core/gcore-go"
+    "github.com/G-Core/gcore-go/cloud"
+    "github.com/G-Core/gcore-go/option"
+)
+
+client := gcore.NewClient(
+    option.WithCloudProjectID(projectID),
+    option.WithCloudRegionID(regionID),
+)
+
+// Create load balancer with listener and pool
+loadBalancer, err := client.Cloud.LoadBalancers.NewAndPoll(context.Background(), 
+    cloud.LoadBalancerNewParams{
+        Name:         "web-lb",
+        VipNetworkID: gcore.String(networkID),
+        VipSubnetID:  gcore.String(subnetID),
+        Listeners: []cloud.LoadBalancerNewParamsListener{
+            {
+                Name:         gcore.String("http-listener"),
+                Protocol:     cloud.LbListenerProtocolHTTP,
+                ProtocolPort: 80,
+            },
+        },
+    },
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Created load balancer: %s (VIP: %s)\n", 
+    loadBalancer.ID, loadBalancer.VipAddress)
+```
+
+### Create Pool with Health Monitor
+
+```go
+// Create pool
+pool, err := client.Cloud.LoadBalancers.Pools.NewAndPoll(context.Background(), 
+    cloud.LoadBalancerPoolNewParams{
+        LoadBalancerID: gcore.String(loadBalancerID),
+        ListenerID:     gcore.String(listenerID),
+        Name:           "web-pool",
+        Protocol:       cloud.LbPoolProtocolHTTP,
+        LbAlgorithm:    cloud.LbAlgorithmRoundRobin,
+    },
+)
+
+// Add health monitor
+healthMonitor, err := client.Cloud.LoadBalancers.Pools.HealthMonitors.NewAndPoll(
+    context.Background(),
+    pool.ID,
+    cloud.LoadBalancerPoolHealthMonitorNewParams{
+        Type:       cloud.LbHealthMonitorTypeHTTP,
+        Delay:      5,  // 5 seconds between checks
+        Timeout:    3,  // 3 second timeout
+        MaxRetries: 3,  // 3 failures before marking unhealthy
+        URLPath:    gcore.String("/health"),
+        HTTPMethod: gcore.String("GET"),
+    },
+)
+```
+
+### Add Backend Servers to Pool
+
+```go
+// Add member 1
+member1, err := client.Cloud.LoadBalancers.Pools.Members.NewAndPoll(
+    context.Background(),
+    poolID,
+    cloud.LoadBalancerPoolMemberNewParams{
+        Address:      "10.0.1.10",
+        ProtocolPort: 8080,
+        Weight:       gcore.Int(100),
+    },
+)
+
+// Add member 2
+member2, err := client.Cloud.LoadBalancers.Pools.Members.NewAndPoll(
+    context.Background(),
+    poolID,
+    cloud.LoadBalancerPoolMemberNewParams{
+        Address:      "10.0.1.11",
+        ProtocolPort: 8080,
+        Weight:       gcore.Int(100),
+    },
+)
+```
+
+### Create HTTPS Load Balancer with TLS
+
+```go
+// First, create a secret with TLS certificate
+secret, err := client.Cloud.Secrets.New(context.Background(), 
+    cloud.SecretNewParams{
+        Name:        "tls-cert",
+        PayloadType: "certificate",
+        Payload:     base64Cert, // Base64 encoded PKCS12
+    },
+)
+
+// Create HTTPS listener
+listener, err := client.Cloud.LoadBalancers.Listeners.NewAndPoll(
+    context.Background(),
+    cloud.LoadBalancerListenerNewParams{
+        LoadBalancerID: loadBalancerID,
+        Name:           gcore.String("https-listener"),
+        Protocol:       cloud.LbListenerProtocolTerminatedHTTPS,
+        ProtocolPort:   443,
+        SecretID:       gcore.String(secret.ID),
+    },
+)
+```
+
+### List Load Balancers
+
+```go
+loadBalancers, err := client.Cloud.LoadBalancers.List(context.Background(), 
+    cloud.LoadBalancerListParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, lb := range loadBalancers.Results {
+    fmt.Printf("LB: %s, VIP: %s, Status: %s\n", 
+        lb.Name, lb.VipAddress, lb.OperatingStatus)
+}
+```
+
+### Get Load Balancer Status
+
+```go
+status, err := client.Cloud.LoadBalancers.Statuses.Get(context.Background(), 
+    loadBalancerID,
+    cloud.LoadBalancerStatusGetParams{},
+)
+if err != nil {
+    log.Fatal(err)
+}
+
+fmt.Printf("Load Balancer Status: %s\n", status.OperatingStatus)
+for _, listener := range status.Listeners {
+    fmt.Printf("  Listener %s: %s\n", listener.Name, listener.OperatingStatus)
+    for _, pool := range listener.Pools {
+        fmt.Printf("    Pool %s: %s\n", pool.Name, pool.OperatingStatus)
+    }
+}
+```
+
+### Get Load Balancer Metrics
+
+```go
+metrics, err := client.Cloud.LoadBalancers.Metrics.List(context.Background(), 
+    loadBalancerID,
+    cloud.LoadBalancerMetricListParams{
+        TimeFrom: gcore.String("2024-01-01T00:00:00Z"),
+        TimeTo:   gcore.String("2024-01-01T01:00:00Z"),
+    },
+)
+
+for _, metric := range metrics.Results {
+    fmt.Printf("Time: %s, CPU: %.2f%%, Memory: %.2f%%\n",
+        metric.Time, metric.CPUUtil, metric.MemoryUtil)
+}
+```
+
+### Resize Load Balancer
+
+```go
+loadBalancer, err := client.Cloud.LoadBalancers.ResizeAndPoll(context.Background(), 
+    loadBalancerID,
+    cloud.LoadBalancerResizeParams{
+        Flavor: "lb-medium",
+    },
+)
+```
+
+### Delete Load Balancer
+
+```go
+err := client.Cloud.LoadBalancers.DeleteAndPoll(context.Background(), 
+    loadBalancerID,
+    cloud.LoadBalancerDeleteParams{},
+)
+```
+
+## Common Use Cases
+
+### Web Application Load Balancer
+
+```go
+// Create load balancer
+lb, _ := client.Cloud.LoadBalancers.NewAndPoll(context.Background(), 
+    cloud.LoadBalancerNewParams{
+        Name:         "webapp-lb",
+        VipNetworkID: gcore.String(networkID),
+        VipSubnetID:  gcore.String(subnetID),
+    },
+)
+
+// Create HTTP listener
+listener, _ := client.Cloud.LoadBalancers.Listeners.NewAndPoll(
+    context.Background(),
+    cloud.LoadBalancerListenerNewParams{
+        LoadBalancerID: lb.ID,
+        Name:           gcore.String("http"),
+        Protocol:       cloud.LbListenerProtocolHTTP,
+        ProtocolPort:   80,
+    },
+)
+
+// Create pool with health check
+pool, _ := client.Cloud.LoadBalancers.Pools.NewAndPoll(context.Background(), 
+    cloud.LoadBalancerPoolNewParams{
+        LoadBalancerID: gcore.String(lb.ID),
+        ListenerID:     gcore.String(listener.ID),
+        Name:           "backend-pool",
+        Protocol:       cloud.LbPoolProtocolHTTP,
+        LbAlgorithm:    cloud.LbAlgorithmRoundRobin,
+    },
+)
+
+// Add health monitor
+_, _ = client.Cloud.LoadBalancers.Pools.HealthMonitors.NewAndPoll(
+    context.Background(),
+    pool.ID,
+    cloud.LoadBalancerPoolHealthMonitorNewParams{
+        Type:       cloud.LbHealthMonitorTypeHTTP,
+        Delay:      10,
+        Timeout:    5,
+        MaxRetries: 3,
+        URLPath:    gcore.String("/"),
+    },
+)
+
+// Add backend servers
+for _, instanceIP := range []string{"10.0.1.10", "10.0.1.11", "10.0.1.12"} {
+    _, _ = client.Cloud.LoadBalancers.Pools.Members.NewAndPoll(
+        context.Background(),
+        pool.ID,
+        cloud.LoadBalancerPoolMemberNewParams{
+            Address:      instanceIP,
+            ProtocolPort: 80,
+        },
+    )
+}
+```
+
+### Session Persistence
+
+```go
+pool, err := client.Cloud.LoadBalancers.Pools.NewAndPoll(context.Background(), 
+    cloud.LoadBalancerPoolNewParams{
+        LoadBalancerID: gcore.String(loadBalancerID),
+        ListenerID:     gcore.String(listenerID),
+        Name:           "sticky-pool",
+        Protocol:       cloud.LbPoolProtocolHTTP,
+        LbAlgorithm:    cloud.LbAlgorithmRoundRobin,
+        SessionPersistence: &cloud.LoadBalancerPoolNewParamsSessionPersistence{
+            Type:           cloud.LbSessionPersistenceTypeHTTPCookie,
+            CookieName:     gcore.String("SERVERID"),
+            PersistenceTimeout: gcore.Int(3600),
+        },
+    },
+)
+```
