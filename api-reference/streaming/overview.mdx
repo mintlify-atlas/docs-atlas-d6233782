@@ -87,9 +87,11 @@ stream, err := client.Streaming.Streams.New(context.TODO(), streaming.StreamNewP
 ### Upload a Video
 
 ```go
-video, err := client.Streaming.Videos.New(context.TODO(), streaming.CreateVideoParam{
-    Name: "My Video",
-    OriginURL: gcore.String("https://example.com/video.mp4"),
+video, err := client.Streaming.Videos.New(context.TODO(), streaming.VideoNewParams{
+    Video: streaming.CreateVideoParam{
+        Name: "My Video",
+        OriginURL: gcore.String("https://example.com/video.mp4"),
+    },
 })
 ```
 
