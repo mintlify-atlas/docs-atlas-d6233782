@@ -1,0 +1,170 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Gcore Go SDK",
+  "projectDescription": "The official Go library providing convenient access to the Gcore REST API",
+  "theme": "palm",
+  "primaryColor": "#5c545c",
+  "lightColor": "#f95e19",
+  "darkColor": "#f4b484",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Getting Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/client-configuration",
+              "core-concepts/authentication",
+              "core-concepts/error-handling",
+              "core-concepts/pagination",
+              "core-concepts/request-options"
+            ]
+          },
+          {
+            "group": "Advanced Usage",
+            "pages": [
+              "advanced/request-fields",
+              "advanced/response-objects",
+              "advanced/unions",
+              "advanced/retries",
+              "advanced/timeouts",
+              "advanced/middleware",
+              "advanced/file-uploads"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/overview"
+            ]
+          },
+          {
+            "group": "Cloud",
+            "pages": [
+              "api-reference/cloud/overview",
+              "api-reference/cloud/projects",
+              "api-reference/cloud/instances",
+              "api-reference/cloud/volumes",
+              "api-reference/cloud/networks",
+              "api-reference/cloud/security-groups",
+              "api-reference/cloud/loadbalancers",
+              "api-reference/cloud/kubernetes",
+              "api-reference/cloud/baremetal"
+            ]
+          },
+          {
+            "group": "CDN",
+            "pages": [
+              "api-reference/cdn/overview",
+              "api-reference/cdn/resources",
+              "api-reference/cdn/rules",
+              "api-reference/cdn/certificates",
+              "api-reference/cdn/logs"
+            ]
+          },
+          {
+            "group": "DNS",
+            "pages": [
+              "api-reference/dns/overview",
+              "api-reference/dns/zones",
+              "api-reference/dns/records"
+            ]
+          },
+          {
+            "group": "Storage",
+            "pages": [
+              "api-reference/storage/overview",
+              "api-reference/storage/buckets",
+              "api-reference/storage/credentials",
+              "api-reference/storage/lifecycle"
+            ]
+          },
+          {
+            "group": "Streaming",
+            "pages": [
+              "api-reference/streaming/overview",
+              "api-reference/streaming/streams",
+              "api-reference/streaming/broadcasts",
+              "api-reference/streaming/players"
+            ]
+          },
+          {
+            "group": "IAM",
+            "pages": [
+              "api-reference/iam/overview",
+              "api-reference/iam/users",
+              "api-reference/iam/api-tokens"
+            ]
+          },
+          {
+            "group": "WAAP",
+            "pages": [
+              "api-reference/waap/overview",
+              "api-reference/waap/domains",
+              "api-reference/waap/rules"
+            ]
+          },
+          {
+            "group": "Security",
+            "pages": [
+              "api-reference/security/overview"
+            ]
+          },
+          {
+            "group": "Fastedge",
+            "pages": [
+              "api-reference/fastedge/overview",
+              "api-reference/fastedge/apps"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Type-safe Go client for Gcore API",
+    "Automatic pagination with ListAutoPaging",
+    "Built-in retry logic with exponential backoff",
+    "Comprehensive error handling with detailed error types",
+    "Request options for customization and middleware support",
+    "Support for file uploads and multipart requests",
+    "Cloud computing resources (VMs, bare metal, Kubernetes)",
+    "CDN resource management and configuration",
+    "DNS zone and record management",
+    "Object storage operations",
+    "Video streaming services",
+    "IAM and security management"
+  ],
+  "publicApiSurface": [
+    "gcore.NewClient() - Main client constructor",
+    "client.Cloud - Cloud computing services",
+    "client.CDN - CDN resources and configuration",
+    "client.DNS - DNS management",
+    "client.Storage - Object storage",
+    "client.Streaming - Video streaming",
+    "client.IAM - Identity and access management",
+    "client.WAAP - Web application and API protection",
+    "client.Security - Security services",
+    "client.Fastedge - Edge computing applications",
+    "option.WithAPIKey() - API authentication",
+    "option.WithMaxRetries() - Configure retry behavior",
+    "option.WithRequestTimeout() - Set request timeouts",
+    "option.WithMiddleware() - Add custom middleware",
+    "ListAutoPaging() - Auto-pagination iterator",
+    "gcore.Error - Structured error type"
+  ]
+}
